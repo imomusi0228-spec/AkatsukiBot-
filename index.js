@@ -40,6 +40,22 @@ client.once('ready', async () => {
         // Start Web Server
         startServer(client);
 
+        // Self-Ping for Keep-Alive
+        const PUBLIC_URL = process.env.PUBLIC_URL;
+        if (PUBLIC_URL) {
+            console.log(`Setting up keep-alive for ${PUBLIC_URL}`);
+            // Initial ping
+            fetch(PUBLIC_URL).catch(e => console.error('Initial ping failed:', e.message));
+
+            setInterval(() => {
+                fetch(PUBLIC_URL)
+                    .then(() => console.log('Keep-Alive ping sent'))
+                    .catch(e => console.error('Keep-Alive ping failed:', e.message));
+            }, 300000); // 5 minutes
+        } else {
+            console.warn('PUBLIC_URL not set, keep-alive disabled.');
+        }
+
     } catch (error) {
         console.error(error);
     }
