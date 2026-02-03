@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Akatsuki Bot Customer Management System",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node index.js"
   },
