@@ -16,31 +16,6 @@ const commands = [
                     option.setName('server_id').setDescription('Server ID').setRequired(true)))
         .addSubcommand(subcommand =>
             subcommand
-                .setName('add')
-                .setDescription('Add a new subscription')
-                .addStringOption(option => option.setName('server_id').setDescription('Server ID').setRequired(true))
-                .addStringOption(option => option.setName('user_id').setDescription('User ID').setRequired(true))
-                .addStringOption(option => option.setName('tier').setDescription('Plan Tier').setRequired(true))
-                .addStringOption(option => option.setName('duration').setDescription('Duration (e.g. 30d, 1y)').setRequired(false)))
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('extend')
-                .setDescription('Extend subscription')
-                .addStringOption(option => option.setName('server_id').setDescription('Server ID').setRequired(true))
-                .addStringOption(option => option.setName('duration').setDescription('Duration to add (e.g. 30d)').setRequired(true)))
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('cancel')
-                .setDescription('Cancel subscription')
-                .addStringOption(option => option.setName('server_id').setDescription('Server ID').setRequired(true)))
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('note')
-                .setDescription('Add a note to subscription')
-                .addStringOption(option => option.setName('server_id').setDescription('Server ID').setRequired(true))
-                .addStringOption(option => option.setName('content').setDescription('Note content').setRequired(true)))
-        .addSubcommand(subcommand =>
-            subcommand
                 .setName('sync')
                 .setDescription('Manually sync subscriptions with roles'))
 ];
