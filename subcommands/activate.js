@@ -88,6 +88,8 @@ module.exports = async (interaction) => {
     }
 
     if (!tier) {
+        console.log(`[Debug] User ${userId} has roles:`, supportMember.roles.cache.map(r => `${r.name} (${r.id})`).join(', '));
+        console.log(`[Debug] Expected IDs:`, JSON.stringify(ROLES));
         return interaction.reply({
             content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、サポートサーバーでProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. DiscordとBooth/PixivFANBOXが連携されているか\n2. ロールが付与されるまで数分待機してみてください`,
             flags: MessageFlags.Ephemeral
