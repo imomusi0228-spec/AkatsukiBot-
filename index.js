@@ -10,51 +10,20 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.MessageContent,
     ],
 });
 
-client.once(Events.ClientReady, async () => {
-    const setBotPresence = () => {
-        client.user.setPresence({
-            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
-            status: 'online'
-        });
-    };
-
-    console.log(`Logged in as ${client.user.tag}!`);
-    setBotPresence();
-
+// 1. Core initialization (Run immediately to satisfy health checks)
+(async () => {
     try {
         await initDB();
-
-        console.log('Skipping command registration on startup. Use "npm run register" if changes are needed.');
-
-        // Initial sync
-        await syncSubscriptions(client);
-        await checkExpirations(client);
-        // Sync every 5 minutes
-        setInterval(() => syncSubscriptions(client), 300000);
-        setInterval(() => checkExpirations(client), 300000);
-
-        // Force presence update every 10 minutes
-        setInterval(() => {
-            console.log('[Presence] Refreshing presence state...');
-            setBotPresence();
-        }, 600000);
-
-        // Start Web Server
         startServer(client);
+        console.log('Web Server and Database initialized.');
 
         // Keep-Alive Mechanism
-        // Prioritize PUBLIC_URL, fallback to RENDER_EXTERNAL_URL (Render.com default)
         const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
-
         if (PUBLIC_URL) {
             console.log(`Setting up Keep-Alive for: ${PUBLIC_URL}`);
-
-            // Function to ping
             const pingSelf = () => {
                 fetch(PUBLIC_URL)
                     .then(res => {
@@ -63,19 +32,43 @@ client.once(Events.ClientReady, async () => {
                     })
                     .catch(e => console.error(`[Keep-Alive] Ping failed: ${e.message}`));
             };
-
-            // Initial ping
             pingSelf();
-
-            // Interval ping (every 5 minutes)
             setInterval(pingSelf, 300000);
-        } else {
-            console.warn('WARNING: No PUBLIC_URL or RENDER_EXTERNAL_URL found. Keep-Alive is disabled. Bot may sleep.');
         }
-
-    } catch (error) {
-        console.error(error);
+    } catch (err) {
+        console.error('Fatal startup error:', err);
+        process.exit(1);
     }
+})();
+
+const setBotPresence = () => {
+    if (client.user) {
+        client.user.setPresence({
+            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
+            status: 'online'
+        });
+    }
+};
+
+client.once(Events.ClientReady, async () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+    setBotPresence();
+
+    console.log('Skipping command registration on startup. Use "npm run register" if changes are needed.');
+
+    // Heavy sync tasks run in background
+    (async () => {
+        try {
+            await syncSubscriptions(client);
+            await checkExpirations(client);
+        } catch (err) {
+            console.error('Background sync/expiry error:', err);
+        }
+    })();
+
+    // Sync every 5 minutes
+    setInterval(() => syncSubscriptions(client), 300000);
+    setInterval(() => checkExpirations(client), 300000);
 });
 
 client.on('interactionCreate', handleInteraction);
@@ -94,22 +87,12 @@ client.on('shardDisconnect', (event, id) => {
 
 client.on('shardReady', (id, unavailableGuilds) => {
     console.log(`Shard ${id} is ready.`);
-    if (client.user) {
-        client.user.setPresence({
-            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
-            status: 'online'
-        });
-    }
+    setBotPresence();
 });
 
 client.on('shardResume', (id, replayedEvents) => {
     console.log(`Shard ${id} resumed.`);
-    if (client.user) {
-        client.user.setPresence({
-            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
-            status: 'online'
-        });
-    }
+    setBotPresence();
 });
 
 client.login(process.env.DISCORD_TOKEN).catch(error => {

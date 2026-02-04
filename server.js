@@ -26,7 +26,30 @@ function authMiddleware(req, res, next) {
 app.get('/api/subscriptions', authMiddleware, async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM subscriptions ORDER BY expiry_date ASC');
-        res.json(result.rows);
+        const subs = result.rows;
+
+        // Fetch names from Discord
+        if (app.discordClient) {
+            const enrichedSubs = await Promise.all(subs.map(async sub => {
+                let serverName = 'Unknown Server';
+                let userName = 'Unknown User';
+
+                try {
+                    const guild = await app.discordClient.guilds.fetch(sub.server_id).catch(() => null);
+                    if (guild) serverName = guild.name;
+
+                    const user = await app.discordClient.users.fetch(sub.user_id).catch(() => null);
+                    if (user) userName = user.tag;
+                } catch (e) {
+                    console.warn(`Failed to fetch names for SID:${sub.server_id} UID:${sub.user_id}: ${e.message}`);
+                }
+
+                return { ...sub, server_name: serverName, user_name: userName };
+            }));
+            res.json(enrichedSubs);
+        } else {
+            res.json(subs);
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

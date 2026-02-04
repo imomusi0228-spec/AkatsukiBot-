@@ -113,8 +113,8 @@
                         <table class="table table-hover table-dark">
                             <thead>
                                 <tr>
-                                    <th>サーバーID</th>
-                                    <th>ユーザーID</th>
+                                    <th>サーバー名 / ID</th>
+                                    <th>ユーザー名 / ID</th>
                                     <th>Tier</th>
                                     <th>ステータス</th>
                                     <th>有効期限</th>
@@ -317,12 +317,18 @@
                 const statusText = sub.is_active ? '有効' : '無効';
 
                 tr.innerHTML = `
-                <td>${sub.server_id}</td>
-                <td>${sub.user_id}</td>
-                <td><span class="badge bg-info text-dark">${sub.plan_tier}</span></td>
+                <td>
+                    <div class="fw-bold text-info">${sub.server_name || 'Unknown'}</div>
+                    <code class="small text-muted">${sub.server_id}</code>
+                </td>
+                <td>
+                    <div class="fw-bold">${sub.user_name || 'Unknown'}</div>
+                    <code class="small text-muted">${sub.user_id}</code>
+                </td>
+                <td><span class="badge bg-primary">${sub.plan_tier}</span></td>
                 <td class="${statusClass}">${statusText}</td>
                 <td>${expiry}</td>
-                <td><small>${(sub.notes || '').replace(/\n/g, '<br>')}</small></td>
+                <td><small class="text-secondary">${(sub.notes || '').replace(/\n/g, '<br>')}</small></td>
                 <td>
                     <button class="btn btn-sm btn-outline-light" onclick="openEditModal('${sub.server_id}', '${sub.plan_tier}', '${encodeURIComponent(sub.notes || '')}')">編集</button>
                 </td>

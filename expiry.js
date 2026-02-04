@@ -1,8 +1,5 @@
 const db = require('./db');
-require('dotenv').config();
-
 const { updateMemberRoles } = require('./sync');
-require('dotenv').config();
 
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
 

@@ -2,16 +2,6 @@ const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, ChannelType, Per
 
 const adminCommands = [
     new SlashCommandBuilder()
-        .setName('list')
-        .setDescription('List all active subscriptions')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
-        .setName('check')
-        .setDescription('Check subscription status for a server')
-        .addStringOption(option =>
-            option.setName('server_id').setDescription('Server ID').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
         .setName('sync')
         .setDescription('Manually sync subscriptions with roles')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -43,7 +33,7 @@ const publicCommands = [
 ];
 
 
-const commands = [...adminCommands, ...publicCommands]; // For backward compatibility if needed, or simple iteration
+const commands = [...adminCommands, ...publicCommands];
 
 async function handleInteraction(interaction) {
     if (interaction.isButton()) {
@@ -57,7 +47,7 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['list', 'check', 'sync', 'activate', 'setup_vc', 'generate_key'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'setup_vc', 'generate_key'].includes(interaction.commandName)) {
         try {
             // Dynamic import based on command name
             // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)
