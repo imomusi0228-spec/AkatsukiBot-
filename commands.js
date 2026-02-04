@@ -29,7 +29,10 @@ const publicCommands = [
         .addStringOption(option =>
             option.setName('server_id').setDescription('Server ID (Optional if used in the server)').setRequired(false))
         .addStringOption(option =>
-            option.setName('key').setDescription('License Key or Booth Order Number').setRequired(false))
+            option.setName('key').setDescription('License Key or Booth Order Number').setRequired(false)),
+    new SlashCommandBuilder()
+        .setName('ping')
+        .setDescription('Check if the bot is alive')
 ];
 
 
@@ -47,24 +50,30 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['sync', 'activate', 'setup_vc', 'generate_key'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'setup_vc', 'generate_key', 'ping'].includes(interaction.commandName)) {
         try {
-            // Dynamic import based on command name
-            // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)
             const commandHandler = require(`./subcommands/${interaction.commandName}`);
             await commandHandler(interaction);
         } catch (error) {
             console.error(`Error executing command ${interaction.commandName}:`, error);
-            // Only reply if not already replied/deferred
             try {
                 if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
+                } else if (interaction.deferred) {
+                    await interaction.editReply({ content: 'エラーが発生しました。' });
                 } else {
                     await interaction.followUp({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
                 }
             } catch (replyError) {
                 console.error('Failed to send error message to user:', replyError);
             }
+        }
+    } else {
+        // Handle unregistered or removed commands to avoid 3-second silence/timeout
+        try {
+            await interaction.reply({ content: 'このコマンドは現在利用できないか、削除されました。', flags: MessageFlags.Ephemeral });
+        } catch (e) {
+            console.error('Failed to reply to unknown command:', e);
         }
     }
 }

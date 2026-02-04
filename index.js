@@ -14,11 +14,13 @@ const client = new Client({
 });
 
 // 1. Core initialization (Run immediately to satisfy health checks)
+startServer(client);
+console.log('Web Server started.');
+
 (async () => {
     try {
         await initDB();
-        startServer(client);
-        console.log('Web Server and Database initialized.');
+        console.log('Database initialized.');
 
         // Keep-Alive Mechanism
         const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
@@ -32,12 +34,12 @@ const client = new Client({
                     })
                     .catch(e => console.error(`[Keep-Alive] Ping failed: ${e.message}`));
             };
-            pingSelf();
+            // Delay first ping slightly to ensure server is ready
+            setTimeout(pingSelf, 5000);
             setInterval(pingSelf, 300000);
         }
     } catch (err) {
-        console.error('Fatal startup error:', err);
-        process.exit(1);
+        console.error('Core background initialization error:', err);
     }
 })();
 
@@ -107,4 +109,6 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
+    // Exit process on uncaught exception to allow platform (Render) to restart the instance
+    process.exit(1);
 });

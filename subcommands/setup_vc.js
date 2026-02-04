@@ -1,9 +1,8 @@
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
 
 module.exports = async (interaction) => {
-    // Check permissions (Admin only)
-    // Permission check is already handled by setDefaultMemberPermissions in commands.js registration,
-    // but good to have a backup or if we want specific custom logic.
+    // 1. Defer immediately to prevent interaction timeout
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const createButton = new ButtonBuilder()
         .setCustomId('create_support_vc')
@@ -20,15 +19,21 @@ module.exports = async (interaction) => {
     const row = new ActionRowBuilder()
         .addComponents(createButton, deleteButton);
 
-    // Send the panel as a normal message to the channel
-    await interaction.channel.send({
-        content: '以下のボタンを押すと、あなた専用のサポート用ボイスチャンネルが作成されます。\n管理者に通知が送信され、対応が開始されます。',
-        components: [row]
-    });
+    try {
+        // Send the panel as a normal message to the channel
+        await interaction.channel.send({
+            content: '以下のボタンを押すと、あなた専用のサポート用ボイスチャンネルが作成されます。\n管理者に通知が送信され、対応が開始されます。',
+            components: [row]
+        });
 
-    // Reply to the command ephemerally to confirm completion
-    await interaction.reply({
-        content: '✅ サポートVC作成パネルを設置しました。',
-        flags: MessageFlags.Ephemeral
-    });
+        // Reply to the command confirm completion
+        await interaction.editReply({
+            content: '✅ サポートVC作成パネルを設置しました。'
+        });
+    } catch (error) {
+        console.error('Error in setup_vc:', error);
+        await interaction.editReply({
+            content: '❌ パネルの設置中にエラーが発生しました。'
+        });
+    }
 };
