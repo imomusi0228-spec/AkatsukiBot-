@@ -1,26 +1,141 @@
 const express = require('express');
 const db = require('./db');
 const { syncSubscriptions, updateMemberRoles } = require('./sync');
+const cookieParser = require('cookie-parser');
+const axios = require('axios');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
+const DISCORD_CLIENT_ID = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+const REDIRECT_URI = `${PUBLIC_URL}/api/auth/callback`;
+
+if (!DISCORD_CLIENT_SECRET) {
+    console.warn('WARNING: DISCORD_CLIENT_SECRET is not set. OAuth login will not work.');
+}
+
+// In-memory session store
+// Map<sessionId, { userId, username, avatar, discriminator, expiry }>
+const sessions = new Map();
 
 app.use(express.json());
 app.use(express.static('public'));
-
+app.use(cookieParser());
 
 // Auth Middleware
 function authMiddleware(req, res, next) {
     const token = req.headers['authorization'];
+    const sessionId = req.cookies['session_id'];
+
     if (token === `Bearer ${ADMIN_TOKEN}` || token === ADMIN_TOKEN) {
-        next();
-    } else {
-        res.status(401).json({ error: 'Unauthorized' });
+        return next();
     }
+
+    if (sessionId && sessions.has(sessionId)) {
+        const session = sessions.get(sessionId);
+        if (session.expiry > Date.now()) {
+            req.user = session;
+            return next();
+        } else {
+            sessions.delete(sessionId);
+        }
+    }
+
+    res.status(401).json({ error: 'Unauthorized' });
 }
+
+// Auth Routes
+app.get('/api/auth/login', (req, res) => {
+    const params = new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: 'code',
+        scope: 'identify guilds'
+    });
+    res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
+});
+
+app.get('/api/auth/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.status(400).send('No code provided');
+
+    try {
+        const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
+            client_id: DISCORD_CLIENT_ID,
+            client_secret: DISCORD_CLIENT_SECRET,
+            code,
+            grant_type: 'authorization_code',
+            redirect_uri: REDIRECT_URI,
+            scope: 'identify guilds'
+        }), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        const { access_token } = tokenResponse.data;
+
+        const userResponse = await axios.get('https://discord.com/api/users/@me', {
+            headers: { Authorization: `Bearer ${access_token}` }
+        });
+
+        const user = userResponse.data;
+
+        // Create session
+        const sessionId = crypto.randomUUID();
+        const expiry = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
+
+        sessions.set(sessionId, {
+            userId: user.id,
+            username: user.username,
+            avatar: user.avatar,
+            discriminator: user.discriminator,
+            expiry
+        });
+
+        res.cookie('session_id', sessionId, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 1000 * 60 * 60 * 24 * 7
+        });
+
+        res.redirect('/');
+
+    } catch (error) {
+        console.error('OAuth Error:', error.response?.data || error.message);
+        res.status(500).send(`Authentication failed: ${JSON.stringify(error.response?.data || error.message)}`);
+    }
+});
+
+app.get('/api/auth/status', (req, res) => {
+    const sessionId = req.cookies['session_id'];
+    if (sessionId && sessions.has(sessionId)) {
+        const session = sessions.get(sessionId);
+        if (session.expiry > Date.now()) {
+            return res.json({
+                authenticated: true,
+                user: {
+                    id: session.userId,
+                    username: session.username,
+                    avatar: session.avatar
+                }
+            });
+        }
+    }
+    res.json({ authenticated: false });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+    const sessionId = req.cookies['session_id'];
+    if (sessionId) {
+        sessions.delete(sessionId);
+        res.clearCookie('session_id');
+    }
+    res.json({ success: true });
+});
 
 // API Routes
 app.get('/api/subscriptions', authMiddleware, async (req, res) => {
