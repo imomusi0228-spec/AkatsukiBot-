@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, Events, ActivityType } = require('discord.js');
 const { initDB } = require('./db');
 const { commands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
@@ -16,13 +16,15 @@ const client = new Client({
 });
 
 client.once(Events.ClientReady, async () => {
-    console.log(`Logged in as ${client.user.tag}!`);
+    const setBotPresence = () => {
+        client.user.setPresence({
+            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
+            status: 'online'
+        });
+    };
 
-    // Explicitly set status
-    client.user.setPresence({
-        activities: [{ name: '/help | 管理ツール' }],
-        status: 'online'
-    });
+    console.log(`Logged in as ${client.user.tag}!`);
+    setBotPresence();
 
     try {
         await initDB();
@@ -57,7 +59,15 @@ client.once(Events.ClientReady, async () => {
         await checkExpirations(client);
         // Sync every hour
         setInterval(() => syncSubscriptions(client), 3600000);
+        // Sync every hour
+        setInterval(() => syncSubscriptions(client), 3600000);
         setInterval(() => checkExpirations(client), 3600000);
+
+        // Force presence update every 10 minutes
+        setInterval(() => {
+            console.log('[Presence] Refreshing presence state...');
+            setBotPresence();
+        }, 600000);
 
         // Start Web Server
         startServer(client);
@@ -105,10 +115,22 @@ client.on('shardDisconnect', (event, id) => {
 
 client.on('shardReady', (id, unavailableGuilds) => {
     console.log(`Shard ${id} is ready.`);
+    if (client.user) {
+        client.user.setPresence({
+            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
+            status: 'online'
+        });
+    }
 });
 
 client.on('shardResume', (id, replayedEvents) => {
     console.log(`Shard ${id} resumed.`);
+    if (client.user) {
+        client.user.setPresence({
+            activities: [{ name: '/help | 管理ツール', type: ActivityType.Playing }],
+            status: 'online'
+        });
+    }
 });
 
 client.login(process.env.DISCORD_TOKEN);
