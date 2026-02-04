@@ -10,21 +10,30 @@ const ROLES = {
 };
 
 module.exports = async (interaction) => {
+    // 1. Defer the reply immediately to prevent "Unknown interaction" timeout errors (3s limit)
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
     const inputServerId = interaction.options.getString('server_id');
-    // If input is provided, use it. Otherwise, use the current guild ID where the command is run.
     const serverId = inputServerId ? inputServerId.trim() : interaction.guildId;
     const userId = interaction.user.id;
+
+    // Debug: Check Environment Variables
+    console.log('[Debug] Env Vars Check:');
+    console.log(`- ROLE_PRO_MONTHLY: ${process.env.ROLE_PRO_MONTHLY ? 'SET' : 'MISSING'}`);
+    console.log(`- ROLE_PRO_YEARLY: ${process.env.ROLE_PRO_YEARLY ? 'SET' : 'MISSING'}`);
+    console.log(`- SUPPORT_GUILD_ID: ${process.env.SUPPORT_GUILD_ID}`);
+    console.log(`- Loaded ROLES object:`, JSON.stringify(ROLES));
 
     // We don't necessarily need "member" from the current guild for ROLE checking anymore,
     // because we will check the Support Server for roles.
     // However, if we are auto-detecting server ID (no input), we must be in a guild.
     if (!serverId) {
-        return interaction.reply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。', flags: MessageFlags.Ephemeral });
+        return interaction.editReply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。' });
     }
 
     // Validation checks
     if (!/^\d{17,19}$/.test(serverId)) {
-        return interaction.reply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。', flags: MessageFlags.Ephemeral });
+        return interaction.editReply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。' });
     }
 
     // Check if bot is present in the target guild
@@ -38,9 +47,8 @@ module.exports = async (interaction) => {
         const isServiceBotPresent = await targetGuild.members.fetch(SERVICE_BOT_ID).catch(() => null);
 
         if (!isServiceBotPresent) {
-            return interaction.reply({
-                content: `❌ **AkatsukiBot (ID: ${SERVICE_BOT_ID}) がサーバーに参加していません。**\nサブスクリプションを有効化するには、対象のサーバーにAkatsukiBotを招待してください。`,
-                flags: MessageFlags.Ephemeral
+            return interaction.editReply({
+                content: `❌ **AkatsukiBot (ID: ${SERVICE_BOT_ID}) がサーバーに参加していません。**\nサブスクリプションを有効化するには、対象のサーバーにAkatsukiBotを招待してください。`
             });
         }
     }
@@ -49,7 +57,7 @@ module.exports = async (interaction) => {
     const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
     if (!SUPPORT_GUILD_ID) {
         console.error('SUPPORT_GUILD_ID is not set in .env');
-        return interaction.reply({ content: 'Botの設定エラーです（サポートサーバーID未設定）。管理者に連絡してください。', flags: MessageFlags.Ephemeral });
+        return interaction.editReply({ content: 'Botの設定エラーです（サポートサーバーID未設定）。管理者に連絡してください。' });
     }
 
     let supportMember = null;
@@ -64,9 +72,8 @@ module.exports = async (interaction) => {
     if (!supportMember) {
         // Fallback checks (e.g. maybe allow if in current guild? No, requirement is support server role)
         const supportServerUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/your-support-server';
-        return interaction.reply({
-            content: `❌ **サポートサーバーでの権限確認に失敗しました。**\n\nサブスクリプションを有効化するには、Botのサポートサーバーに参加している必要があります。\n\n🆘 **サポートサーバー:** [参加する](${supportServerUrl})`,
-            flags: MessageFlags.Ephemeral
+        return interaction.editReply({
+            content: `❌ **サポートサーバーでの権限確認に失敗しました。**\n\nサブスクリプションを有効化するには、Botのサポートサーバーに参加している必要があります。\n\n🆘 **サポートサーバー:** [参加する](${supportServerUrl})`
         });
     }
 
@@ -91,9 +98,10 @@ module.exports = async (interaction) => {
     if (!tier) {
         console.log(`[Debug] User ${userId} has roles:`, supportMember.roles.cache.map(r => `${r.name} (${r.id})`).join(', '));
         console.log(`[Debug] Expected IDs:`, JSON.stringify(ROLES));
-        return interaction.reply({
-            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、サポートサーバーでProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. DiscordとBooth/PixivFANBOXが連携されているか\n2. ロールが付与されるまで数分待機してみてください`,
-            flags: MessageFlags.Ephemeral
+        console.log(`[Debug] ROLE_PRO_MONTHLY raw:`, process.env.ROLE_PRO_MONTHLY);
+
+        return interaction.editReply({
+            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、サポートサーバーでProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. DiscordとBooth/PixivFANBOXが連携されているか\n2. ロールが付与されるまで数分待機してみてください`
         });
     }
 
@@ -106,7 +114,7 @@ module.exports = async (interaction) => {
             // Check if it's the SAME server (reactivation/update) or different
             const currentSub = existing.rows[0];
             if (currentSub.server_id !== serverId) {
-                return interaction.reply({ content: `既に別のサーバー (ID: ${currentSub.server_id}) が登録されています。1ユーザーにつき1サーバーまで登録可能です。`, flags: MessageFlags.Ephemeral });
+                return interaction.editReply({ content: `既に別のサーバー (ID: ${currentSub.server_id}) が登録されています。1ユーザーにつき1サーバーまで登録可能です。` });
             }
             // If same server, maybe update? For now, just reject or say "Already active"
             // Let's allow updating if it's the same server (e.g. extending or re-applying)
@@ -130,10 +138,10 @@ module.exports = async (interaction) => {
         await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
             [serverId, 'ACTIVATE_SELF', `Tier: ${tier}, Exp: ${expiryDate.toLocaleDateString()}`]);
 
-        await interaction.reply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryDate.toLocaleDateString()}`, flags: MessageFlags.Ephemeral });
+        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryDate.toLocaleDateString()}` });
 
     } catch (err) {
         console.error(err);
-        await interaction.reply({ content: 'エラーが発生しました。管理者に連絡してください。', flags: MessageFlags.Ephemeral });
+        await interaction.editReply({ content: 'エラーが発生しました。管理者に連絡してください。' });
     }
 };
