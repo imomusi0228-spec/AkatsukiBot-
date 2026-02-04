@@ -36,6 +36,21 @@ async function initDB() {
       );
     `);
 
+    // license_keys table (for BOTH custom keys and validated booth order numbers)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS license_keys (
+        key_id VARCHAR(50) PRIMARY KEY,
+        plan_tier VARCHAR(50) NOT NULL,
+        duration_months INTEGER NOT NULL,
+        is_used BOOLEAN DEFAULT FALSE,
+        used_by_user VARCHAR(255),
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT
+      );
+    `);
+
+
     console.log('Database tables initialized.');
   } catch (err) {
     console.error('Error initializing database:', err);

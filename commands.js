@@ -18,6 +18,17 @@ const adminCommands = [
     new SlashCommandBuilder()
         .setName('setup_vc')
         .setDescription('Setup Support VC creation panel')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('generate_key')
+        .setDescription('Generate a one-time license key')
+        .addStringOption(option =>
+            option.setName('tier').setDescription('Plan tier (Pro/Pro+)').setRequired(true)
+                .addChoices({ name: 'Pro', value: 'Pro' }, { name: 'Pro+', value: 'Pro+' }))
+        .addIntegerOption(option =>
+            option.setName('months').setDescription('Duration in months').setRequired(true))
+        .addStringOption(option =>
+            option.setName('note').setDescription('Memo for this key'))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
@@ -26,8 +37,11 @@ const publicCommands = [
         .setName('activate')
         .setDescription('Activate subscription for a server')
         .addStringOption(option =>
-            option.setName('server_id').setDescription('Server ID').setRequired(false))
+            option.setName('server_id').setDescription('Server ID (Optional if used in the server)').setRequired(false))
+        .addStringOption(option =>
+            option.setName('key').setDescription('License Key or Booth Order Number').setRequired(false))
 ];
+
 
 const commands = [...adminCommands, ...publicCommands]; // For backward compatibility if needed, or simple iteration
 
@@ -41,7 +55,7 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['list', 'check', 'sync', 'activate', 'setup_vc'].includes(interaction.commandName)) {
+    if (['list', 'check', 'sync', 'activate', 'setup_vc', 'generate_key'].includes(interaction.commandName)) {
         try {
             // Dynamic import based on command name
             // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)

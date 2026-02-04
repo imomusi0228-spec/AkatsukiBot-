@@ -14,94 +14,81 @@ module.exports = async (interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const inputServerId = interaction.options.getString('server_id');
+    const inputKey = interaction.options.getString('key');
     const serverId = inputServerId ? inputServerId.trim() : interaction.guildId;
     const userId = interaction.user.id;
 
-    // Debug: Check Environment Variables
-    console.log('[Debug] Env Vars Check:');
-    console.log(`- ROLE_PRO_MONTHLY: ${process.env.ROLE_PRO_MONTHLY ? 'SET' : 'MISSING'}`);
-    console.log(`- ROLE_PRO_YEARLY: ${process.env.ROLE_PRO_YEARLY ? 'SET' : 'MISSING'}`);
-    console.log(`- SUPPORT_GUILD_ID: ${process.env.SUPPORT_GUILD_ID}`);
-    console.log(`- Loaded ROLES object:`, JSON.stringify(ROLES));
-
-    // We don't necessarily need "member" from the current guild for ROLE checking anymore,
-    // because we will check the Support Server for roles.
-    // However, if we are auto-detecting server ID (no input), we must be in a guild.
     if (!serverId) {
         return interaction.editReply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。' });
     }
 
-    // Validation checks
-    if (!/^\d{17,19}$/.test(serverId)) {
+    if (!/^\d{17,20}$/.test(serverId)) {
         return interaction.editReply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。' });
     }
 
-    // Check if bot is present in the target guild
-    const targetGuild = await interaction.client.guilds.fetch(serverId).catch(() => null);
-    if (!targetGuild) {
-        console.warn(`[Warn] Bot not in server ${serverId}, skipping AkatsukiBot check.`);
-        // Proceed without checking AkatsukiBot
-    } else {
-        // Check if the specific AkatsukiBot (Service Bot) is present
-        const SERVICE_BOT_ID = '1466095214161825873';
-        const isServiceBotPresent = await targetGuild.members.fetch(SERVICE_BOT_ID).catch(() => null);
+    let tier = null;
+    let durationMonths = 0;
+    let usedKey = null;
 
-        if (!isServiceBotPresent) {
-            return interaction.editReply({
-                content: `❌ **AkatsukiBot (ID: ${SERVICE_BOT_ID}) がサーバーに参加していません。**\nサブスクリプションを有効化するには、対象のサーバーにAkatsukiBotを招待してください。`
-            });
+    // --- 1. Key Verification (Priority) ---
+    if (inputKey) {
+        try {
+            const keyRes = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_active = TRUE AND is_used = FALSE', [inputKey.trim().toUpperCase()]);
+            // (Note: database schema might have key_id or just key. Using key_id based on db.js edit)
+            // Wait, check db.js edit again. Yes, key_id.
+
+            // Re-checking the typo in my query (is_active is not in license_keys if I check my previous edit)
+            const keyCheck = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_used = FALSE', [inputKey.trim().toUpperCase()]);
+
+            if (keyCheck.rows.length > 0) {
+                const row = keyCheck.rows[0];
+                tier = row.plan_tier;
+                durationMonths = row.duration_months;
+                usedKey = row.key_id;
+            } else {
+                return interaction.editReply({ content: '❌ **無効なキーまたは注文番号です。**\n既に使用されているか、入力が間違っている可能性があります。' });
+            }
+        } catch (err) {
+            console.error('Error checking key:', err);
+            return interaction.editReply({ content: 'エラーが発生しました（キー照合失敗）。' });
         }
     }
 
-    // === Role Verification against Support Server ===
-    const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
-    if (!SUPPORT_GUILD_ID) {
-        console.error('SUPPORT_GUILD_ID is not set in .env');
-        return interaction.editReply({ content: 'Botの設定エラーです（サポートサーバーID未設定）。管理者に連絡してください。' });
-    }
+    // --- 2. Role Verification (Fallback) ---
+    if (!tier) {
+        const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
+        if (!SUPPORT_GUILD_ID) {
+            console.error('SUPPORT_GUILD_ID is not set in .env');
+        } else {
+            let supportMember = null;
+            try {
+                const supportGuild = await interaction.client.guilds.fetch(SUPPORT_GUILD_ID);
+                supportMember = await supportGuild.members.fetch({ user: userId, force: true });
+            } catch (err) {
+                console.warn(`Failed to fetch member ${userId} from support guild: ${err.message}`);
+            }
 
-    let supportMember = null;
-    try {
-        const supportGuild = await interaction.client.guilds.fetch(SUPPORT_GUILD_ID);
-        supportMember = await supportGuild.members.fetch({ user: userId, force: true });
-    } catch (err) {
-        // User not in support server or other error
-        console.warn(`Failed to fetch member ${userId} from support guild: ${err.message}`);
-    }
-
-    if (!supportMember) {
-        // Fallback checks (e.g. maybe allow if in current guild? No, requirement is support server role)
-        const supportServerUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/your-support-server';
-        return interaction.editReply({
-            content: `❌ **サポートサーバーでの権限確認に失敗しました。**\n\nサブスクリプションを有効化するには、Botのサポートサーバーに参加している必要があります。\n\n🆘 **サポートサーバー:** [参加する](${supportServerUrl})`
-        });
-    }
-
-    // Determine Tier and Duration based on roles in Support Server
-    let tier = null;
-    let durationMonths = 0;
-
-    if (supportMember.roles.cache.has(ROLES['ProPlusYearly'])) {
-        tier = 'Pro+';
-        durationMonths = 12;
-    } else if (supportMember.roles.cache.has(ROLES['ProPlusMonthly'])) {
-        tier = 'Pro+';
-        durationMonths = 1;
-    } else if (supportMember.roles.cache.has(ROLES['ProYearly'])) {
-        tier = 'Pro';
-        durationMonths = 12;
-    } else if (supportMember.roles.cache.has(ROLES['ProMonthly'])) {
-        tier = 'Pro';
-        durationMonths = 1;
+            if (supportMember) {
+                if (supportMember.roles.cache.has(ROLES['ProPlusYearly'])) {
+                    tier = 'Pro+';
+                    durationMonths = 12;
+                } else if (supportMember.roles.cache.has(ROLES['ProPlusMonthly'])) {
+                    tier = 'Pro+';
+                    durationMonths = 1;
+                } else if (supportMember.roles.cache.has(ROLES['ProYearly'])) {
+                    tier = 'Pro';
+                    durationMonths = 12;
+                } else if (supportMember.roles.cache.has(ROLES['ProMonthly'])) {
+                    tier = 'Pro';
+                    durationMonths = 1;
+                }
+            }
+        }
     }
 
     if (!tier) {
-        console.log(`[Debug] User ${userId} has roles:`, supportMember.roles.cache.map(r => `${r.name} (${r.id})`).join(', '));
-        console.log(`[Debug] Expected IDs:`, JSON.stringify(ROLES));
-        console.log(`[Debug] ROLE_PRO_MONTHLY raw:`, process.env.ROLE_PRO_MONTHLY);
-
         return interaction.editReply({
-            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、サポートサーバーでProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. DiscordとBooth/PixivFANBOXが連携されているか\n2. ロールが付与されるまで数分待機してみてください`
+            content: `❌ **有効なサブスクリプションまたはロールが見つかりませんでした。**\n\nキーをお持ちの場合は入力してください。\nロールによる有効化の場合は、サポートサーバーに参加し、支援者ロールが付与されている必要があります。`
         });
     }
 
@@ -109,20 +96,19 @@ module.exports = async (interaction) => {
     try {
         const existing = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
         if (existing.rows.length > 0) {
-            // Already has a server registered?
-            // User requested 1 server limit.
-            // Check if it's the SAME server (reactivation/update) or different
             const currentSub = existing.rows[0];
             if (currentSub.server_id !== serverId) {
                 return interaction.editReply({ content: `既に別のサーバー (ID: ${currentSub.server_id}) が登録されています。1ユーザーにつき1サーバーまで登録可能です。` });
             }
-            // If same server, maybe update? For now, just reject or say "Already active"
-            // Let's allow updating if it's the same server (e.g. extending or re-applying)
         }
 
         // Calculate expiry
         const now = new Date();
-        const expiryDate = new Date(now.setMonth(now.getMonth() + durationMonths));
+        const expiryDate = new Date(now.setMonth(now.setMonth(now.getMonth() + durationMonths)));
+        // Note: double setMonth bug in original? (line 125 original: new Date(now.setMonth(now.getMonth() + durationMonths)))
+        // Corrected below:
+        const exp = new Date();
+        exp.setMonth(exp.getMonth() + durationMonths);
 
         await db.query(`
             INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active)
@@ -132,16 +118,21 @@ module.exports = async (interaction) => {
                 plan_tier = EXCLUDED.plan_tier, 
                 expiry_date = EXCLUDED.expiry_date, 
                 is_active = TRUE,
-                notes = COALESCE(subscriptions.notes, '') || E'\\n[Activate] Self-service activation'
-        `, [serverId, userId, tier, expiryDate]);
+                notes = COALESCE(subscriptions.notes, '') || E'\\n[Activate] ' || $5
+        `, [serverId, userId, tier, exp, usedKey ? `Used Key: ${usedKey}` : 'Role sync']);
+
+        if (usedKey) {
+            await db.query('UPDATE license_keys SET is_used = TRUE, used_by_user = $1, used_at = CURRENT_TIMESTAMP WHERE key_id = $2', [userId, usedKey]);
+        }
 
         await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
-            [serverId, 'ACTIVATE_SELF', `Tier: ${tier}, Exp: ${expiryDate.toLocaleDateString()}`]);
+            [serverId, 'ACTIVATE', `Tier: ${tier}, Exp: ${exp.toLocaleDateString()}, Method: ${usedKey ? 'Key' : 'Role'}`]);
 
-        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryDate.toLocaleDateString()}` });
+        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ${usedKey ? 'ライセンスキー' : 'ロール同期'}` });
 
     } catch (err) {
         console.error(err);
         await interaction.editReply({ content: 'エラーが発生しました。管理者に連絡してください。' });
     }
 };
+

@@ -1,14 +1,16 @@
 const express = require('express');
 const db = require('./db');
-const { syncSubscriptions } = require('./sync');
+const { syncSubscriptions, updateMemberRoles } = require('./sync');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
 
 app.use(express.json());
 app.use(express.static('public'));
+
 
 // Auth Middleware
 function authMiddleware(req, res, next) {
@@ -70,10 +72,11 @@ app.put('/api/subscriptions/:id', authMiddleware, async (req, res) => {
 
     try {
         if (action === 'extend') {
-            const currentSub = await db.query('SELECT expiry_date FROM subscriptions WHERE server_id = $1', [id]);
+            const currentSub = await db.query('SELECT user_id, expiry_date, plan_tier FROM subscriptions WHERE server_id = $1', [id]);
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
-            let currentExpiry = currentSub.rows[0].expiry_date ? new Date(currentSub.rows[0].expiry_date) : new Date();
+            const subData = currentSub.rows[0];
+            let currentExpiry = subData.expiry_date ? new Date(subData.expiry_date) : new Date();
             if (currentExpiry < new Date()) currentExpiry = new Date();
 
             const match = duration.match(/^(\d+)([dmy])$/);
@@ -87,12 +90,30 @@ app.put('/api/subscriptions/:id', authMiddleware, async (req, res) => {
             await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE WHERE server_id = $2', [currentExpiry, id]);
             await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'EXTEND_WEB', `New Exp: ${currentExpiry}`]);
 
+            // Sync roles
+            const guild = await app.discordClient.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
+            if (guild) {
+                await updateMemberRoles(guild, subData.user_id, subData.plan_tier);
+            }
+
         } else if (action === 'update_tier') {
+            const currentSub = await db.query('SELECT user_id FROM subscriptions WHERE server_id = $1', [id]);
+            if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+
             await db.query('UPDATE subscriptions SET plan_tier = $1 WHERE server_id = $2', [tier, id]);
             await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'UPDATE_WEB', `Tier: ${tier}`]);
+
+            // Sync roles
+            const guild = await app.discordClient.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
+            if (guild) {
+                await updateMemberRoles(guild, currentSub.rows[0].user_id, tier);
+            }
         } else if (action === 'toggle_active') {
             await db.query('UPDATE subscriptions SET is_active = $1 WHERE server_id = $2', [is_active, id]);
             await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'UPDATE_WEB', `Active: ${is_active}`]);
+
+            // If deactivating, we might want to remove roles, but the standard 'sync' handles Free/Inactive.
+            // For now, let's keep it simple.
         }
         else if (action === 'update_note') {
             await db.query('UPDATE subscriptions SET notes = $1 WHERE server_id = $2', [notes, id]);

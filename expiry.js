@@ -1,11 +1,10 @@
 const db = require('./db');
 require('dotenv').config();
 
+const { updateMemberRoles } = require('./sync');
+require('dotenv').config();
+
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
-const ROLES = {
-    'Pro': process.env.PRO_ROLE_ID,
-    'Pro+': process.env.PRO_PLUS_ROLE_ID
-};
 
 /**
  * Checks for expired subscriptions and downgrades them to Free.
@@ -14,9 +13,6 @@ const ROLES = {
 async function checkExpirations(client) {
     console.log('Checking for expired subscriptions...');
     try {
-        // Find subscriptions that have expired and are not Free
-        // We assume 'is_active' is true for them. If is_active is false, we ignore them or they are already cancelled.
-        // We want to transition them to Free, so we keep is_active = TRUE but change tier to Free.
         const res = await db.query(`
             SELECT * FROM subscriptions 
             WHERE plan_tier != 'Free' 
@@ -41,23 +37,20 @@ async function checkExpirations(client) {
 
             // 1. Remove Roles & Notify
             try {
+                await updateMemberRoles(guild, sub.user_id, 'Free');
+
                 const member = await guild.members.fetch(sub.user_id).catch(() => null);
                 if (member) {
-                    await member.roles.remove([ROLES['Pro'], ROLES['Pro+']]);
-                    console.log(`Removed roles for ${member.user.tag}`);
-
                     // Send DM
                     const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
                     await member.send({
                         content: `**【重要】AkatsukiBot サブスクリプション期限切れのお知らせ**\n\n平素よりAkatsukiBotをご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sub.server_id}) のプラン有効期限が切れ、**Freeプラン**へ変更されました。\nPro/Pro+機能を引き続きご利用いただくには、再度サブスクリプションの購入をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`
                     }).catch(e => console.warn(`Failed to send DM to ${member.user.tag}: ${e.message}`));
-
-                } else {
-                    console.warn(`User ${sub.user_id} not found in guild.`);
                 }
             } catch (err) {
-                console.error(`Failed to remove roles for ${sub.user_id}:`, err);
+                console.error(`Failed to notify/remove roles for ${sub.user_id}:`, err);
             }
+
 
             // 2. Update DB to Free
             // We clear expiry_date because Free doesn't expire (or we could set it to null)

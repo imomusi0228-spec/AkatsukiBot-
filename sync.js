@@ -11,6 +11,52 @@ const ROLES = {
 };
 
 /**
+ * Updates member roles based on the given tier.
+ * @param {import('discord.js').Guild} guild 
+ * @param {string} userId 
+ * @param {string} tier 
+ */
+async function updateMemberRoles(guild, userId, tier) {
+    try {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) {
+            console.warn(`User ${userId} not found in guild ${guild.id}.`);
+            return false;
+        }
+
+        const rolesToRemove = [
+            ROLES['ProMonthly'], ROLES['ProYearly'],
+            ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']
+        ].filter(id => id); // Remove empty/null strings
+
+        let rolesToAdd = [];
+        if (tier === 'Pro+') {
+            // Favor Yearly if both might exist, but usually just one
+            rolesToAdd = [ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']].filter(id => id);
+        } else if (tier === 'Pro') {
+            rolesToAdd = [ROLES['ProMonthly'], ROLES['ProYearly']].filter(id => id);
+        }
+
+        // To be safe, we only add the roles the user *actually* should have based on current roles if we wanted to be precise,
+        // but typically we just add what corresponds to the tier.
+        // Actually, if we are sync-ing TIERS, we should probably know WHICH exact role they have.
+        // But for updateMemberRoles(web), let's just make sure they have at least one of the tier roles.
+
+        await member.roles.remove(rolesToRemove);
+        if (rolesToAdd.length > 0) {
+            // Add the first valid role for that tier
+            await member.roles.add(rolesToAdd[0]);
+        }
+
+        console.log(`Updated roles for ${member.user.tag} to ${tier}`);
+        return true;
+    } catch (err) {
+        console.error(`Failed to update roles for ${userId}:`, err);
+        return false;
+    }
+}
+
+/**
  * Syncs subscriptions based on roles in the support server.
  * @param {Client} client 
  */
@@ -22,8 +68,7 @@ async function syncSubscriptions(client) {
         return { success: false, message: 'Support guild not found.' };
     }
 
-    // Fetch all members (ensure permission/intent)
-    // Wrap in try-catch to handle Rate Limits or other fetch errors gracefully
+    // Fetch all members
     let members;
     try {
         members = await guild.members.fetch();
@@ -37,7 +82,6 @@ async function syncSubscriptions(client) {
 
     for (const [memberId, member] of members) {
         let tier = 'Free';
-        // Determine highest tier
         if (member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
             tier = 'Pro+';
         } else if (member.roles.cache.has(ROLES['ProYearly']) || member.roles.cache.has(ROLES['ProMonthly'])) {
@@ -46,19 +90,6 @@ async function syncSubscriptions(client) {
 
         if (tier !== 'Free') {
             try {
-                // Find which server this user owns or is associated with.
-                // NOTE: In this basic version, we might assume the User ID is the key for now, 
-                // OR we need a mapping. 
-                // However, the current DB uses server_id as PK. 
-                // If the user hasn't registered a server via /sub add, we can't guess the server ID.
-                // 
-                // STRATEGY:
-                // 1. Check if there's an existing active subscription for this user_id.
-                // 2. If yes, update it.
-                // 3. If no, we can't create one because we don't know the server_id.
-                //    (Unless we want to store user-based subs directly, but schema is server_id based)
-
-                // Let's modify the query to find ANY subscription owned by this user.
                 const res = await db.query('SELECT server_id, plan_tier FROM subscriptions WHERE user_id = $1', [memberId]);
 
                 if (res.rows.length > 0) {
@@ -73,33 +104,15 @@ async function syncSubscriptions(client) {
                             updatedCount++;
                         }
                     }
-                } else {
-                    // User has role but no registered server in DB.
-                    // We could log this or ignore.
-                    // errors.push(`User ${member.user.tag} has ${tier} role but no registered server.`);
                 }
-
             } catch (err) {
                 console.error(`Error syncing user ${memberId}:`, err);
                 errors.push(`Error syncing ${member.user.tag}`);
             }
         } else {
-            // User is Free (no roles).
-            // Check if they had a Pro/Pro+ sub that should be downgraded/cancelled?
-            // Only if it was auto-renew/role-managed? 
-            // For safety, we might NOT auto-cancel unless we are sure it was role-based.
-            // But the request implies "server management" so let's allow downgrading if found.
-
             const res = await db.query('SELECT server_id, plan_tier FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [memberId]);
             for (const row of res.rows) {
-                // Check if current tier is one of the paid ones we manage
                 if (row.plan_tier === 'Pro' || row.plan_tier === 'Pro+') {
-                    // Downgrade or expire?
-                    // Let's set expiry to NOW if it was previously undefined or future, 
-                    // effectively cancelling it, or just mark inactive?
-                    // Let's just log it for now to be safe, or set is_active false.
-                    // "Role removed -> cancel"
-
                     await db.query('UPDATE subscriptions SET is_active = FALSE, notes = COALESCE(notes, \'\') || E\'\\n[Auto-Sync] Role removed\' WHERE server_id = $1', [row.server_id]);
                     await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
                         [row.server_id, 'SYNC_CANCEL', 'Role removed, subscription deactivated']);
@@ -113,4 +126,5 @@ async function syncSubscriptions(client) {
     return { success: true, updated: updatedCount, errors };
 }
 
-module.exports = { syncSubscriptions };
+module.exports = { syncSubscriptions, updateMemberRoles };
+
