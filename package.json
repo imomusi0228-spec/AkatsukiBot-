@@ -7,7 +7,8 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "register": "node register.js"
   },
   "keywords": [],
   "author": "",

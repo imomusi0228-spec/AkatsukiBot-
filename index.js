@@ -29,39 +29,7 @@ client.once(Events.ClientReady, async () => {
     try {
         await initDB();
 
-        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-
-        console.log('Started refreshing application (/) commands.');
-
-        // 1. Global Commands: Only 'activate' (publicCommands)
-        const publicCommandsJson = publicCommands.map(cmd => cmd.toJSON());
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: publicCommandsJson },
-        );
-        console.log('Successfully reloaded GLOBAL application (/) commands (activate only).');
-
-        // 2. Guild Commands: Admin commands (adminCommands) -> Support Guild Only
-        const adminCommandsJson = adminCommands.map(cmd => cmd.toJSON());
-        const guildId = process.env.SUPPORT_GUILD_ID;
-
-        if (guildId) {
-            // Note: If we want 'activate' to ALSO be in guild commands (for faster update/dev), we could include it,
-            // but global registration overrides or merges. Usually global takes time to propagate.
-            // For safety and clean separation: Global = activate, Guild = admin.
-            // But if we want Admins to use activate quickly in support server, it's fine if it's global.
-            // Let's just register adminCommands to the guild.
-
-            await rest.put(
-                Routes.applicationGuildCommands(client.user.id, guildId),
-                { body: adminCommandsJson },
-            );
-            console.log(`Successfully reloaded GUILD application (/) commands for guild ${guildId} (Admin tools).`);
-        } else {
-            console.warn('SUPPORT_GUILD_ID is not set. Skipping guild command registration.');
-        }
-
-        console.log('Successfully reloaded application (/) commands.');
+        console.log('Skipping command registration on startup. Use "npm run register" if changes are needed.');
 
         // Initial sync
         await syncSubscriptions(client);
