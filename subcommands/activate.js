@@ -103,10 +103,6 @@ module.exports = async (interaction) => {
         }
 
         // Calculate expiry
-        const now = new Date();
-        const expiryDate = new Date(now.setMonth(now.setMonth(now.getMonth() + durationMonths)));
-        // Note: double setMonth bug in original? (line 125 original: new Date(now.setMonth(now.getMonth() + durationMonths)))
-        // Corrected below:
         const exp = new Date();
         exp.setMonth(exp.getMonth() + durationMonths);
 
