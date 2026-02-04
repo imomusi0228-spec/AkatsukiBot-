@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-const commands = [
+const adminCommands = [
     new SlashCommandBuilder()
         .setName('list')
         .setDescription('List all active subscriptions')
@@ -16,11 +16,6 @@ const commands = [
         .setDescription('Manually sync subscriptions with roles')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
-        .setName('activate')
-        .setDescription('Activate subscription for a server')
-        .addStringOption(option =>
-            option.setName('server_id').setDescription('Server ID').setRequired(false)),
-    new SlashCommandBuilder()
         .setName('status')
         .setDescription('Check bot health and status')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -29,6 +24,16 @@ const commands = [
         .setDescription('Setup Support VC creation panel')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
+
+const publicCommands = [
+    new SlashCommandBuilder()
+        .setName('activate')
+        .setDescription('Activate subscription for a server')
+        .addStringOption(option =>
+            option.setName('server_id').setDescription('Server ID').setRequired(false))
+];
+
+const commands = [...adminCommands, ...publicCommands]; // For backward compatibility if needed, or simple iteration
 
 async function handleInteraction(interaction) {
     if (interaction.isButton()) {
@@ -116,4 +121,4 @@ async function handleSupportVCButton(interaction) {
     }
 }
 
-module.exports = { commands, handleInteraction };
+module.exports = { commands, adminCommands, publicCommands, handleInteraction };

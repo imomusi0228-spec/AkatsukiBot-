@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits, REST, Routes, Events, ActivityType } = require('discord.js');
 const { initDB } = require('./db');
-const { commands, handleInteraction } = require('./commands');
+const { commands, adminCommands, publicCommands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
 const { checkExpirations } = require('./expiry');
 const { startServer } = require('./server');
@@ -33,21 +33,30 @@ client.once(Events.ClientReady, async () => {
 
         console.log('Started refreshing application (/) commands.');
 
-        // Convert commands to JSON for registration
-        const commandsJson = commands.map(cmd => cmd.toJSON());
+        // 1. Global Commands: Only 'activate' (publicCommands)
+        const publicCommandsJson = publicCommands.map(cmd => cmd.toJSON());
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: publicCommandsJson },
+        );
+        console.log('Successfully reloaded GLOBAL application (/) commands (activate only).');
 
-        // Clear global commands to avoid duplicates
-        await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
-        console.log('Successfully cleared global application (/) commands.');
-
-        // Register guild commands
+        // 2. Guild Commands: Admin commands (adminCommands) -> Support Guild Only
+        const adminCommandsJson = adminCommands.map(cmd => cmd.toJSON());
         const guildId = process.env.SUPPORT_GUILD_ID;
+
         if (guildId) {
+            // Note: If we want 'activate' to ALSO be in guild commands (for faster update/dev), we could include it,
+            // but global registration overrides or merges. Usually global takes time to propagate.
+            // For safety and clean separation: Global = activate, Guild = admin.
+            // But if we want Admins to use activate quickly in support server, it's fine if it's global.
+            // Let's just register adminCommands to the guild.
+
             await rest.put(
                 Routes.applicationGuildCommands(client.user.id, guildId),
-                { body: commandsJson },
+                { body: adminCommandsJson },
             );
-            console.log(`Successfully reloaded application (/) commands for guild ${guildId}.`);
+            console.log(`Successfully reloaded GUILD application (/) commands for guild ${guildId} (Admin tools).`);
         } else {
             console.warn('SUPPORT_GUILD_ID is not set. Skipping guild command registration.');
         }
