@@ -112,6 +112,10 @@ client.once(Events.ClientReady, async () => {
 
 client.on('interactionCreate', handleInteraction);
 
+client.on('error', error => {
+    console.error('Discord Client Error:', error);
+});
+
 client.on('shardError', error => {
     console.error('A websocket connection encountered an error:', error);
 });
@@ -140,4 +144,16 @@ client.on('shardResume', (id, replayedEvents) => {
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN).catch(error => {
+    console.error('Failed to login:', error);
+    process.exit(1);
+});
+
+// Global error handling to prevent silent validation failures
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});

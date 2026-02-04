@@ -50,10 +50,14 @@ async function handleInteraction(interaction) {
         } catch (error) {
             console.error(`Error executing command ${interaction.commandName}:`, error);
             // Only reply if not already replied/deferred
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
-            } else {
-                await interaction.followUp({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
+            try {
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
+                } else {
+                    await interaction.followUp({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
+                }
+            } catch (replyError) {
+                console.error('Failed to send error message to user:', replyError);
             }
         }
     }
