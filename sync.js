@@ -21,7 +21,15 @@ async function syncSubscriptions(client) {
     }
 
     // Fetch all members (ensure permission/intent)
-    const members = await guild.members.fetch();
+    // Wrap in try-catch to handle Rate Limits or other fetch errors gracefully
+    let members;
+    try {
+        members = await guild.members.fetch();
+    } catch (fetchError) {
+        console.error('Failed to fetch members for sync:', fetchError);
+        return { success: false, message: 'Failed to fetch members (possibly Rate Limited).', error: fetchError };
+    }
+
     let updatedCount = 0;
     let errors = [];
 

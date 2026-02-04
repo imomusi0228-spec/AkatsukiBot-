@@ -10,12 +10,29 @@ const ROLES = {
 };
 
 module.exports = async (interaction) => {
-    const serverId = interaction.options.getString('server_id');
+    const inputServerId = interaction.options.getString('server_id');
+    const serverId = inputServerId ? inputServerId.trim() : '';
     const userId = interaction.user.id;
     const member = interaction.member;
 
     if (!member) {
         return interaction.reply({ content: 'このコマンドはサーバー内でのみ実行できます。', flags: MessageFlags.Ephemeral });
+    }
+
+    // Validation: Check if server ID is numeric and 17-19 characters
+    if (!/^\d{17,19}$/.test(serverId)) {
+        return interaction.reply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。', flags: MessageFlags.Ephemeral });
+    }
+
+    // Check if bot is present in the target guild
+    // This is not strictly blocking (we can allow activating for a server the bot will join later), 
+    // but it's good practice to warn or check.
+    // Let's just warn if not found, but proceed (or maybe blocking is safer to avoid typos).
+    // Given the user wants "strictness", let's BLOCK if bot is not in guild? 
+    // Actually, "bot is not in server" means we can't manage it. So blocking is better.
+    const targetGuild = await interaction.client.guilds.fetch(serverId).catch(() => null);
+    if (!targetGuild) {
+        return interaction.reply({ content: `❌ **Botが指定されたサーバー (ID: ${serverId}) に参加していません。**\n先にBotをサーバーに招待してください。`, flags: MessageFlags.Ephemeral });
     }
 
     // Determine Tier and Duration based on roles
@@ -38,11 +55,8 @@ module.exports = async (interaction) => {
     }
 
     if (!tier) {
-        const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
-        const supportServerUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/your-support-server'; // 環境変数がない場合のフォールバック
-
         return interaction.reply({
-            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、ProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. サポートサーバーに参加しているか\n2. DiscordとBooth/PixivFANBOXが連携されているか\n\n🛒 **プランの購入はこちら:** [Booth](${boothUrl})\n🆘 **サポートサーバー:** [参加する](${supportServerUrl})`,
+            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、ProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. サポートサーバーに参加しているか\n2. DiscordとBooth/PixivFANBOXが連携されているか`,
             flags: MessageFlags.Ephemeral
         });
     }
