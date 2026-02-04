@@ -38,7 +38,12 @@ module.exports = async (interaction) => {
 
     if (!tier) {
         const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
-        return interaction.reply({ content: `有効なサブスクリプションロール（ProまたはPro+）が見つかりませんでした。\n[こちらからプランを購入してください](${boothUrl})`, ephemeral: true });
+        const supportServerUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/your-support-server'; // 環境変数がない場合のフォールバック
+
+        return interaction.reply({
+            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、ProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. サポートサーバーに参加しているか\n2. DiscordとBooth/PixivFANBOXが連携されているか\n\n🛒 **プランの購入はこちら:** [Booth](${boothUrl})\n🆘 **サポートサーバー:** [参加する](${supportServerUrl})`,
+            ephemeral: true
+        });
     }
 
     // Check existing subscriptions for this user

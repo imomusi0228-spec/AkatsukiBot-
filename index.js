@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
 const { initDB } = require('./db');
 const { commands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
@@ -13,7 +13,7 @@ const client = new Client({
     ],
 });
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
     try {
