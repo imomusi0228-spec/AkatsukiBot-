@@ -54,7 +54,7 @@ module.exports = async (interaction) => {
     let supportMember = null;
     try {
         const supportGuild = await interaction.client.guilds.fetch(SUPPORT_GUILD_ID);
-        supportMember = await supportGuild.members.fetch(userId);
+        supportMember = await supportGuild.members.fetch({ user: userId, force: true });
     } catch (err) {
         // User not in support server or other error
         console.warn(`Failed to fetch member ${userId} from support guild: ${err.message}`);
