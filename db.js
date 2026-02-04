@@ -36,6 +36,19 @@ async function initDB() {
       );
     `);
 
+    // user_sessions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        session_id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        username VARCHAR(255),
+        avatar VARCHAR(255),
+        discriminator VARCHAR(255),
+        expiry TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // license_keys table (for BOTH custom keys and validated booth order numbers)
     await client.query(`
       CREATE TABLE IF NOT EXISTS license_keys (

@@ -12,23 +12,23 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
 const DISCORD_CLIENT_ID = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 const REDIRECT_URI = `${PUBLIC_URL}/api/auth/callback`;
 
 if (!DISCORD_CLIENT_SECRET) {
     console.warn('WARNING: DISCORD_CLIENT_SECRET is not set. OAuth login will not work.');
 }
 
-// In-memory session store
+// In-memory session store REMOVED in favor of DB
 // Map<sessionId, { userId, username, avatar, discriminator, expiry }>
-const sessions = new Map();
+// const sessions = new Map();
 
 app.use(express.json());
 app.use(express.static('public'));
 app.use(cookieParser());
 
 // Auth Middleware
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
     const token = req.headers['authorization'];
     const sessionId = req.cookies['session_id'];
 
@@ -36,13 +36,26 @@ function authMiddleware(req, res, next) {
         return next();
     }
 
-    if (sessionId && sessions.has(sessionId)) {
-        const session = sessions.get(sessionId);
-        if (session.expiry > Date.now()) {
-            req.user = session;
-            return next();
-        } else {
-            sessions.delete(sessionId);
+    if (sessionId) {
+        try {
+            const result = await db.query('SELECT * FROM user_sessions WHERE session_id = $1', [sessionId]);
+            if (result.rows.length > 0) {
+                const session = result.rows[0];
+                if (new Date(session.expiry) > new Date()) {
+                    req.user = {
+                        userId: session.user_id,
+                        username: session.username,
+                        avatar: session.avatar,
+                        discriminator: session.discriminator
+                    };
+                    return next();
+                } else {
+                    // Start cleanup but don't wait for it
+                    db.query('DELETE FROM user_sessions WHERE session_id = $1', [sessionId]).catch(console.error);
+                }
+            }
+        } catch (err) {
+            console.error('Session check error:', err);
         }
     }
 
@@ -51,17 +64,39 @@ function authMiddleware(req, res, next) {
 
 // Auth Routes
 app.get('/api/auth/login', (req, res) => {
+    // Generate state to prevent CSRF
+    const state = crypto.randomUUID();
+
+    // Store state in a short-lived cookie
+    res.cookie('oauth_state', state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 1000 * 60 * 5 // 5 minutes
+    });
+
     const params = new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
         redirect_uri: REDIRECT_URI,
         response_type: 'code',
-        scope: 'identify guilds'
+        scope: 'identify guilds',
+        state: state
     });
     res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
 
 app.get('/api/auth/callback', async (req, res) => {
-    const { code } = req.query;
+    const { code, state } = req.query;
+    const storedState = req.cookies['oauth_state'];
+
+    // Verify state
+    if (!state || !storedState || state !== storedState) {
+        console.warn('OAuth State Mismatch');
+        return res.status(403).send('Invalid state parameter');
+    }
+
+    // Clear state cookie
+    res.clearCookie('oauth_state');
+
     if (!code) return res.status(400).send('No code provided');
 
     try {
@@ -86,15 +121,13 @@ app.get('/api/auth/callback', async (req, res) => {
 
         // Create session
         const sessionId = crypto.randomUUID();
-        const expiry = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
+        const expiry = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
 
-        sessions.set(sessionId, {
-            userId: user.id,
-            username: user.username,
-            avatar: user.avatar,
-            discriminator: user.discriminator,
-            expiry
-        });
+        // Store in DB
+        await db.query(
+            'INSERT INTO user_sessions (session_id, user_id, username, avatar, discriminator, expiry) VALUES ($1, $2, $3, $4, $5, $6)',
+            [sessionId, user.id, user.username, user.avatar, user.discriminator, expiry]
+        );
 
         res.cookie('session_id', sessionId, {
             httpOnly: true,
@@ -110,28 +143,39 @@ app.get('/api/auth/callback', async (req, res) => {
     }
 });
 
-app.get('/api/auth/status', (req, res) => {
+app.get('/api/auth/status', async (req, res) => {
     const sessionId = req.cookies['session_id'];
-    if (sessionId && sessions.has(sessionId)) {
-        const session = sessions.get(sessionId);
-        if (session.expiry > Date.now()) {
-            return res.json({
-                authenticated: true,
-                user: {
-                    id: session.userId,
-                    username: session.username,
-                    avatar: session.avatar
+    if (sessionId) {
+        try {
+            const result = await db.query('SELECT * FROM user_sessions WHERE session_id = $1', [sessionId]);
+            if (result.rows.length > 0) {
+                const session = result.rows[0];
+                if (new Date(session.expiry) > new Date()) {
+                    return res.json({
+                        authenticated: true,
+                        user: {
+                            id: session.user_id,
+                            username: session.username,
+                            avatar: session.avatar
+                        }
+                    });
                 }
-            });
+            }
+        } catch (err) {
+            console.error('Status check error:', err);
         }
     }
     res.json({ authenticated: false });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
     const sessionId = req.cookies['session_id'];
     if (sessionId) {
-        sessions.delete(sessionId);
+        try {
+            await db.query('DELETE FROM user_sessions WHERE session_id = $1', [sessionId]);
+        } catch (err) {
+            console.error('Logout error:', err);
+        }
         res.clearCookie('session_id');
     }
     res.json({ success: true });
