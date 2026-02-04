@@ -1,7 +1,8 @@
 const { syncSubscriptions } = require('../sync');
+const { MessageFlags } = require('discord.js');
 
 module.exports = async (interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const result = await syncSubscriptions(interaction.client);
     if (result.success) {
         await interaction.editReply(`同期完了。更新数: ${result.updated}`);
