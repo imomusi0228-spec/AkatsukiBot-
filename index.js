@@ -43,20 +43,30 @@ client.once('ready', async () => {
         // Start Web Server
         startServer(client);
 
-        // Self-Ping for Keep-Alive
-        const PUBLIC_URL = process.env.PUBLIC_URL;
+        // Keep-Alive Mechanism
+        // Prioritize PUBLIC_URL, fallback to RENDER_EXTERNAL_URL (Render.com default)
+        const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
+        
         if (PUBLIC_URL) {
-            console.log(`Setting up keep-alive for ${PUBLIC_URL}`);
-            // Initial ping
-            fetch(PUBLIC_URL).catch(e => console.error('Initial ping failed:', e.message));
-
-            setInterval(() => {
+            console.log(`Setting up Keep-Alive for: ${PUBLIC_URL}`);
+            
+            // Function to ping
+            const pingSelf = () => {
                 fetch(PUBLIC_URL)
-                    .then(() => console.log('Keep-Alive ping sent'))
-                    .catch(e => console.error('Keep-Alive ping failed:', e.message));
-            }, 300000); // 5 minutes
+                    .then(res => {
+                        if (res.ok) console.log(`[Keep-Alive] Ping successful: ${res.status}`);
+                        else console.warn(`[Keep-Alive] Ping returned status: ${res.status}`);
+                    })
+                    .catch(e => console.error(`[Keep-Alive] Ping failed: ${e.message}`));
+            };
+
+            // Initial ping
+            pingSelf();
+
+            // Interval ping (every 5 minutes)
+            setInterval(pingSelf, 300000);
         } else {
-            console.warn('PUBLIC_URL not set, keep-alive disabled.');
+            console.warn('WARNING: No PUBLIC_URL or RENDER_EXTERNAL_URL found. Keep-Alive is disabled. Bot may sleep.');
         }
 
     } catch (error) {
