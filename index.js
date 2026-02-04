@@ -95,4 +95,20 @@ client.once(Events.ClientReady, async () => {
 
 client.on('interactionCreate', handleInteraction);
 
+client.on('shardError', error => {
+    console.error('A websocket connection encountered an error:', error);
+});
+
+client.on('shardDisconnect', (event, id) => {
+    console.log(`Shard ${id} disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+});
+
+client.on('shardReady', (id, unavailableGuilds) => {
+    console.log(`Shard ${id} is ready.`);
+});
+
+client.on('shardResume', (id, replayedEvents) => {
+    console.log(`Shard ${id} resumed.`);
+});
+
 client.login(process.env.DISCORD_TOKEN);
