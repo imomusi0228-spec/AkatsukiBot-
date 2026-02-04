@@ -97,10 +97,21 @@ client.on('shardResume', (id, replayedEvents) => {
     setBotPresence();
 });
 
-client.login(process.env.DISCORD_TOKEN).catch(error => {
-    console.error('Failed to login:', error);
+console.log('Attempting to login to Discord...');
+if (!process.env.DISCORD_TOKEN) {
+    console.error('DISCORD_TOKEN is not defined in environment variables!');
     process.exit(1);
-});
+}
+console.log(`Token prefix: ${process.env.DISCORD_TOKEN.substring(0, 10)}...`);
+
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        console.log('client.login() prompt returned successfully.');
+    })
+    .catch(error => {
+        console.error('Failed to login:', error);
+        process.exit(1);
+    });
 
 // Global error handling to prevent silent validation failures
 process.on('unhandledRejection', (reason, promise) => {
