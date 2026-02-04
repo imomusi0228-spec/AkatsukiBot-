@@ -4,8 +4,10 @@ require('dotenv').config();
 
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
 const ROLES = {
-    'Pro': process.env.PRO_ROLE_ID,
-    'Pro+': process.env.PRO_PLUS_ROLE_ID
+    'ProMonthly': (process.env.ROLE_PRO_MONTHLY || '').trim(),
+    'ProYearly': (process.env.ROLE_PRO_YEARLY || '').trim(),
+    'ProPlusMonthly': (process.env.ROLE_PRO_PLUS_MONTHLY || '').trim(),
+    'ProPlusYearly': (process.env.ROLE_PRO_PLUS_YEARLY || '').trim()
 };
 
 /**
@@ -36,8 +38,11 @@ async function syncSubscriptions(client) {
     for (const [memberId, member] of members) {
         let tier = 'Free';
         // Determine highest tier
-        if (member.roles.cache.has(ROLES['Pro+'])) tier = 'Pro+';
-        else if (member.roles.cache.has(ROLES['Pro'])) tier = 'Pro';
+        if (member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
+            tier = 'Pro+';
+        } else if (member.roles.cache.has(ROLES['ProYearly']) || member.roles.cache.has(ROLES['ProMonthly'])) {
+            tier = 'Pro';
+        }
 
         if (tier !== 'Free') {
             try {

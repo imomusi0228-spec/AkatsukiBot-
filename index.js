@@ -66,9 +66,9 @@ client.once(Events.ClientReady, async () => {
         // Initial sync
         await syncSubscriptions(client);
         await checkExpirations(client);
-        // Sync every hour
-        setInterval(() => syncSubscriptions(client), 3600000);
-        setInterval(() => checkExpirations(client), 3600000);
+        // Sync every 5 minutes
+        setInterval(() => syncSubscriptions(client), 300000);
+        setInterval(() => checkExpirations(client), 300000);
 
         // Force presence update every 10 minutes
         setInterval(() => {

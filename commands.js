@@ -16,10 +16,6 @@ const adminCommands = [
         .setDescription('Manually sync subscriptions with roles')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
-        .setName('status')
-        .setDescription('Check bot health and status')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
         .setName('setup_vc')
         .setDescription('Setup Support VC creation panel')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -45,7 +41,7 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['list', 'check', 'sync', 'activate', 'status', 'setup_vc'].includes(interaction.commandName)) {
+    if (['list', 'check', 'sync', 'activate', 'setup_vc'].includes(interaction.commandName)) {
         try {
             // Dynamic import based on command name
             // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)
