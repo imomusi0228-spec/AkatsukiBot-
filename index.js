@@ -26,10 +26,21 @@ client.once('ready', async () => {
         // Convert commands to JSON for registration
         const commandsJson = commands.map(cmd => cmd.toJSON());
 
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commandsJson },
-        );
+        // Clear global commands to avoid duplicates
+        await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
+        console.log('Successfully cleared global application (/) commands.');
+
+        // Register guild commands
+        const guildId = process.env.SUPPORT_GUILD_ID;
+        if (guildId) {
+            await rest.put(
+                Routes.applicationGuildCommands(client.user.id, guildId),
+                { body: commandsJson },
+            );
+            console.log(`Successfully reloaded application (/) commands for guild ${guildId}.`);
+        } else {
+            console.warn('SUPPORT_GUILD_ID is not set. Skipping guild command registration.');
+        }
 
         console.log('Successfully reloaded application (/) commands.');
 
@@ -46,10 +57,10 @@ client.once('ready', async () => {
         // Keep-Alive Mechanism
         // Prioritize PUBLIC_URL, fallback to RENDER_EXTERNAL_URL (Render.com default)
         const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
-        
+
         if (PUBLIC_URL) {
             console.log(`Setting up Keep-Alive for: ${PUBLIC_URL}`);
-            
+
             // Function to ping
             const pingSelf = () => {
                 fetch(PUBLIC_URL)
