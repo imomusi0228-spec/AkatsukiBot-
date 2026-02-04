@@ -5,14 +5,20 @@ module.exports = async (interaction) => {
     // Permission check is already handled by setDefaultMemberPermissions in commands.js registration,
     // but good to have a backup or if we want specific custom logic.
 
-    const button = new ButtonBuilder()
+    const createButton = new ButtonBuilder()
         .setCustomId('create_support_vc')
         .setLabel('サポートVCを作成')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🎧');
 
+    const deleteButton = new ButtonBuilder()
+        .setCustomId('delete_support_vc')
+        .setLabel('通話を終了する')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🚫');
+
     const row = new ActionRowBuilder()
-        .addComponents(button);
+        .addComponents(createButton, deleteButton);
 
     // Send the panel as a normal message to the channel
     await interaction.channel.send({

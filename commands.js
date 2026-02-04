@@ -49,6 +49,8 @@ async function handleInteraction(interaction) {
     if (interaction.isButton()) {
         if (interaction.customId === 'create_support_vc') {
             await handleSupportVCButton(interaction);
+        } else if (interaction.customId === 'delete_support_vc') {
+            await handleDeleteVCButton(interaction);
         }
         return;
     }
@@ -127,6 +129,54 @@ async function handleSupportVCButton(interaction) {
 
     } catch (error) {
         console.error('Error creating support VC:', error);
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
+        } else {
+            await interaction.editReply({ content: 'エラーが発生しました。' });
+        }
+    }
+}
+
+async function handleDeleteVCButton(interaction) {
+    const guild = interaction.guild;
+    const user = interaction.user;
+
+    try {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const channelName = `support-${user.username}`.toLowerCase();
+
+        // Find the channel
+        const channel = guild.channels.cache.find(c =>
+            (c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildText) &&
+            c.name.toLowerCase() === channelName
+        );
+
+        if (!channel) {
+            return await interaction.editReply({
+                content: `❌ **サポート用ボイスチャンネルが見つかりませんでした。**\n名前: \`${channelName}\``
+            });
+        }
+
+        // Delete the channel
+        await channel.delete(`Support VC closed by ${user.tag}`);
+
+        // Notify Owner
+        const owner = await guild.fetchOwner();
+        try {
+            await owner.send({
+                content: `🗑️ **サポートVC削除通知**\n\n**サーバー:** ${guild.name}\n**ユーザー:** ${user.tag} (${user.id})\n**チャンネル:** ${channelName} (削除済み)`
+            });
+        } catch (dmError) {
+            console.error('Failed to send DM to owner on deletion:', dmError);
+        }
+
+        await interaction.editReply({
+            content: `✅ **サポート用ボイスチャンネルを削除しました。**`
+        });
+
+    } catch (error) {
+        console.error('Error deleting support VC:', error);
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ content: 'エラーが発生しました。', flags: MessageFlags.Ephemeral });
         } else {
