@@ -33,6 +33,17 @@ module.exports = async (interaction) => {
         return interaction.reply({ content: `❌ **Botが指定されたサーバー (ID: ${serverId}) に参加していません。**\n先にBotをサーバーに招待してください。`, flags: MessageFlags.Ephemeral });
     }
 
+    // Check if the specific AkatsukiBot (Service Bot) is present
+    const SERVICE_BOT_ID = '1466095214161825873';
+    const isServiceBotPresent = await targetGuild.members.fetch(SERVICE_BOT_ID).catch(() => null);
+
+    if (!isServiceBotPresent) {
+        return interaction.reply({
+            content: `❌ **AkatsukiBot (ID: ${SERVICE_BOT_ID}) がサーバーに参加していません。**\nサブスクリプションを有効化するには、対象のサーバーにAkatsukiBotを招待してください。`,
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
     // === Role Verification against Support Server ===
     const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
     if (!SUPPORT_GUILD_ID) {
