@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const { initDB } = require('./db');
 const { commands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
+const { checkExpirations } = require('./expiry');
 const { startServer } = require('./server');
 require('dotenv').config();
 
@@ -34,8 +35,10 @@ client.once('ready', async () => {
 
         // Initial sync
         await syncSubscriptions(client);
+        await checkExpirations(client);
         // Sync every hour
         setInterval(() => syncSubscriptions(client), 3600000);
+        setInterval(() => checkExpirations(client), 3600000);
 
         // Start Web Server
         startServer(client);
