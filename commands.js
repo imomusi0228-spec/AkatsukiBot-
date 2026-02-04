@@ -1,17 +1,20 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const commands = [
     new SlashCommandBuilder()
         .setName('list')
-        .setDescription('List all active subscriptions'),
+        .setDescription('List all active subscriptions')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
         .setName('check')
         .setDescription('Check subscription status for a server')
         .addStringOption(option =>
-            option.setName('server_id').setDescription('Server ID').setRequired(true)),
+            option.setName('server_id').setDescription('Server ID').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
         .setName('sync')
-        .setDescription('Manually sync subscriptions with roles'),
+        .setDescription('Manually sync subscriptions with roles')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
         .setName('activate')
         .setDescription('Activate subscription for a server')
@@ -19,16 +22,14 @@ const commands = [
             option.setName('server_id').setDescription('Server ID').setRequired(true)),
     new SlashCommandBuilder()
         .setName('status')
-        .setDescription('Check bot health and status'),
-    new SlashCommandBuilder()
-        .setName('help')
-        .setDescription('Show help information')
+        .setDescription('Check bot health and status')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
 async function handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
 
-    if (['list', 'check', 'sync', 'activate', 'status', 'help'].includes(interaction.commandName)) {
+    if (['list', 'check', 'sync', 'activate', 'status'].includes(interaction.commandName)) {
         try {
             // Dynamic import based on command name
             // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)
