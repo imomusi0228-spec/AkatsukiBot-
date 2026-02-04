@@ -19,13 +19,16 @@ const commands = [
             option.setName('server_id').setDescription('Server ID').setRequired(true)),
     new SlashCommandBuilder()
         .setName('status')
-        .setDescription('Check bot health and status')
+        .setDescription('Check bot health and status'),
+    new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Show help information')
 ];
 
 async function handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
 
-    if (['list', 'check', 'sync', 'activate', 'status'].includes(interaction.commandName)) {
+    if (['list', 'check', 'sync', 'activate', 'status', 'help'].includes(interaction.commandName)) {
         try {
             // Dynamic import based on command name
             // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)

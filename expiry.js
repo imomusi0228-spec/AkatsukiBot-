@@ -39,12 +39,19 @@ async function checkExpirations(client) {
         for (const sub of res.rows) {
             console.log(`Processing expiry for Server: ${sub.server_id}, User: ${sub.user_id}`);
 
-            // 1. Remove Roles
+            // 1. Remove Roles & Notify
             try {
                 const member = await guild.members.fetch(sub.user_id).catch(() => null);
                 if (member) {
                     await member.roles.remove([ROLES['Pro'], ROLES['Pro+']]);
                     console.log(`Removed roles for ${member.user.tag}`);
+
+                    // Send DM
+                    const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
+                    await member.send({
+                        content: `**【重要】AkatsukiBot サブスクリプション期限切れのお知らせ**\n\n平素よりAkatsukiBotをご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sub.server_id}) のプラン有効期限が切れ、**Freeプラン**へ変更されました。\nPro/Pro+機能を引き続きご利用いただくには、再度サブスクリプションの購入をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`
+                    }).catch(e => console.warn(`Failed to send DM to ${member.user.tag}: ${e.message}`));
+
                 } else {
                     console.warn(`User ${sub.user_id} not found in guild.`);
                 }

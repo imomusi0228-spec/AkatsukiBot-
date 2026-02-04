@@ -37,7 +37,8 @@ module.exports = async (interaction) => {
     }
 
     if (!tier) {
-        return interaction.reply({ content: '有効なサブスクリプションロール（ProまたはPro+）が見つかりませんでした。Boothでの購入状況を確認してください。', ephemeral: true });
+        const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
+        return interaction.reply({ content: `有効なサブスクリプションロール（ProまたはPro+）が見つかりませんでした。\n[こちらからプランを購入してください](${boothUrl})`, ephemeral: true });
     }
 
     // Check existing subscriptions for this user
