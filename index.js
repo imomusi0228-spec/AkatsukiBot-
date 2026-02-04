@@ -16,6 +16,12 @@ const client = new Client({
 client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
+    // Explicitly set status
+    client.user.setPresence({
+        activities: [{ name: '/help | 管理ツール' }],
+        status: 'online'
+    });
+
     try {
         await initDB();
 
