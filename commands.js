@@ -11,13 +11,18 @@ const commands = [
             option.setName('server_id').setDescription('Server ID').setRequired(true)),
     new SlashCommandBuilder()
         .setName('sync')
-        .setDescription('Manually sync subscriptions with roles')
+        .setDescription('Manually sync subscriptions with roles'),
+    new SlashCommandBuilder()
+        .setName('activate')
+        .setDescription('Activate subscription for a server')
+        .addStringOption(option =>
+            option.setName('server_id').setDescription('Server ID').setRequired(true))
 ];
 
 async function handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
 
-    if (['list', 'check', 'sync'].includes(interaction.commandName)) {
+    if (['list', 'check', 'sync', 'activate'].includes(interaction.commandName)) {
         try {
             // Dynamic import based on command name
             // Note: Use commandName directly as filenames match (list.js, check.js, sync.js)
