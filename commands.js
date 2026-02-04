@@ -19,7 +19,7 @@ const commands = [
         .setName('activate')
         .setDescription('Activate subscription for a server')
         .addStringOption(option =>
-            option.setName('server_id').setDescription('Server ID').setRequired(true)),
+            option.setName('server_id').setDescription('Server ID').setRequired(false)),
     new SlashCommandBuilder()
         .setName('status')
         .setDescription('Check bot health and status')

@@ -11,52 +11,74 @@ const ROLES = {
 
 module.exports = async (interaction) => {
     const inputServerId = interaction.options.getString('server_id');
-    const serverId = inputServerId ? inputServerId.trim() : '';
+    // If input is provided, use it. Otherwise, use the current guild ID where the command is run.
+    const serverId = inputServerId ? inputServerId.trim() : interaction.guildId;
     const userId = interaction.user.id;
-    const member = interaction.member;
 
-    if (!member) {
-        return interaction.reply({ content: 'このコマンドはサーバー内でのみ実行できます。', flags: MessageFlags.Ephemeral });
+    // We don't necessarily need "member" from the current guild for ROLE checking anymore,
+    // because we will check the Support Server for roles.
+    // However, if we are auto-detecting server ID (no input), we must be in a guild.
+    if (!serverId) {
+        return interaction.reply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。', flags: MessageFlags.Ephemeral });
     }
 
-    // Validation: Check if server ID is numeric and 17-19 characters
+    // Validation checks
     if (!/^\d{17,19}$/.test(serverId)) {
         return interaction.reply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。', flags: MessageFlags.Ephemeral });
     }
 
     // Check if bot is present in the target guild
-    // This is not strictly blocking (we can allow activating for a server the bot will join later), 
-    // but it's good practice to warn or check.
-    // Let's just warn if not found, but proceed (or maybe blocking is safer to avoid typos).
-    // Given the user wants "strictness", let's BLOCK if bot is not in guild? 
-    // Actually, "bot is not in server" means we can't manage it. So blocking is better.
     const targetGuild = await interaction.client.guilds.fetch(serverId).catch(() => null);
     if (!targetGuild) {
         return interaction.reply({ content: `❌ **Botが指定されたサーバー (ID: ${serverId}) に参加していません。**\n先にBotをサーバーに招待してください。`, flags: MessageFlags.Ephemeral });
     }
 
-    // Determine Tier and Duration based on roles
+    // === Role Verification against Support Server ===
+    const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
+    if (!SUPPORT_GUILD_ID) {
+        console.error('SUPPORT_GUILD_ID is not set in .env');
+        return interaction.reply({ content: 'Botの設定エラーです（サポートサーバーID未設定）。管理者に連絡してください。', flags: MessageFlags.Ephemeral });
+    }
+
+    let supportMember = null;
+    try {
+        const supportGuild = await interaction.client.guilds.fetch(SUPPORT_GUILD_ID);
+        supportMember = await supportGuild.members.fetch(userId);
+    } catch (err) {
+        // User not in support server or other error
+        console.warn(`Failed to fetch member ${userId} from support guild: ${err.message}`);
+    }
+
+    if (!supportMember) {
+        // Fallback checks (e.g. maybe allow if in current guild? No, requirement is support server role)
+        const supportServerUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/your-support-server';
+        return interaction.reply({
+            content: `❌ **サポートサーバーでの権限確認に失敗しました。**\n\nサブスクリプションを有効化するには、Botのサポートサーバーに参加している必要があります。\n\n🆘 **サポートサーバー:** [参加する](${supportServerUrl})`,
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    // Determine Tier and Duration based on roles in Support Server
     let tier = null;
     let durationMonths = 0;
 
-    // Priority: Pro+ > Pro, Yearly > Monthly
-    if (member.roles.cache.has(ROLES['ProPlusYearly'])) {
+    if (supportMember.roles.cache.has(ROLES['ProPlusYearly'])) {
         tier = 'Pro+';
         durationMonths = 12;
-    } else if (member.roles.cache.has(ROLES['ProPlusMonthly'])) {
+    } else if (supportMember.roles.cache.has(ROLES['ProPlusMonthly'])) {
         tier = 'Pro+';
         durationMonths = 1;
-    } else if (member.roles.cache.has(ROLES['ProYearly'])) {
+    } else if (supportMember.roles.cache.has(ROLES['ProYearly'])) {
         tier = 'Pro';
         durationMonths = 12;
-    } else if (member.roles.cache.has(ROLES['ProMonthly'])) {
+    } else if (supportMember.roles.cache.has(ROLES['ProMonthly'])) {
         tier = 'Pro';
         durationMonths = 1;
     }
 
     if (!tier) {
         return interaction.reply({
-            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、ProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. サポートサーバーに参加しているか\n2. DiscordとBooth/PixivFANBOXが連携されているか`,
+            content: `❌ **有効なサブスクリプションロールが見つかりませんでした。**\n\nこの機能を使用するには、サポートサーバーでProまたはPro+プランの支援者ロールが必要です。\nもし既に支援済みの場合は、以下の点をご確認ください：\n1. DiscordとBooth/PixivFANBOXが連携されているか\n2. ロールが付与されるまで数分待機してみてください`,
             flags: MessageFlags.Ephemeral
         });
     }
