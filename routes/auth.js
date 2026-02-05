@@ -19,6 +19,9 @@ setInterval(() => {
     usedCodes.clear();
 }, 1000 * 60 * 10);
 
+// Circuit Breaker for Rate Limiting (Cloudflare Error 1015)
+let rateLimitUntil = 0;
+
 // Auth Middleware
 async function authMiddleware(req, res, next) {
     const token = req.headers['authorization'];
@@ -56,6 +59,11 @@ async function authMiddleware(req, res, next) {
 
 // Login Route
 router.get('/login', (req, res) => {
+    if (Date.now() < rateLimitUntil) {
+        console.warn('[Circuit Breaker] Blocking request due to active rate limit.');
+        return res.redirect('/error.html');
+    }
+
     const state = crypto.randomUUID();
     res.cookie('oauth_state', state, {
         httpOnly: true,
@@ -76,6 +84,11 @@ router.get('/login', (req, res) => {
 
 // Callback Route
 router.get('/callback', async (req, res) => {
+    if (Date.now() < rateLimitUntil) {
+        console.warn('[Circuit Breaker] Blocking callback due to active rate limit.');
+        return res.redirect('/error.html');
+    }
+
     const { code, state } = req.query;
     const storedState = req.cookies['oauth_state'];
 
@@ -129,7 +142,23 @@ router.get('/callback', async (req, res) => {
         res.redirect('/');
 
     } catch (error) {
-        console.error('OAuth Error:', error.response?.data || error.message);
+        const status = error.response?.status;
+        const data = error.response?.data;
+        const message = error.message || '';
+
+        console.error('OAuth Error:', data || message);
+
+        // Check for Cloudflare Rate Limit (Status 403/429 with HTML body often containing "1015" or "Cloudflare")
+        // Or if the error message itself mentions 1015
+        if (
+            status === 429 ||
+            (status === 403 && typeof data === 'string' && (data.includes('1015') || data.includes('Cloudflare'))) ||
+            message.includes('1015')
+        ) {
+            console.error('!!! RATE LIMIT DETECTED !!! Triggering Circuit Breaker for 30 minutes.');
+            rateLimitUntil = Date.now() + (30 * 60 * 1000); // 30 minutes cooldown
+        }
+
         // Do not return 500 JSON, redirect to error page to prevent reload loops
         res.redirect('/error.html');
     }
