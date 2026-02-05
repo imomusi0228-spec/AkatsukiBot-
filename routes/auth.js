@@ -12,6 +12,13 @@ const PORT = process.env.PORT || 3000;
 const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 const REDIRECT_URI = `${PUBLIC_URL}/api/auth/callback`;
 
+// Cache for used codes to prevent replay attacks and rate limits
+const usedCodes = new Set();
+// Cleanup used codes every 10 minutes
+setInterval(() => {
+    usedCodes.clear();
+}, 1000 * 60 * 10);
+
 // Auth Middleware
 async function authMiddleware(req, res, next) {
     const token = req.headers['authorization'];
@@ -74,11 +81,18 @@ router.get('/callback', async (req, res) => {
 
     if (!state || !storedState || state !== storedState) {
         console.warn('OAuth State Mismatch');
-        return res.status(403).send('Invalid state parameter');
+        return res.redirect('/error.html');
     }
     res.clearCookie('oauth_state');
 
-    if (!code) return res.status(400).send('No code provided');
+    if (!code) return res.redirect('/error.html');
+
+    // Check if code has been used recently
+    if (usedCodes.has(code)) {
+        console.warn('[OAuth] Code replay detected. Blocking request.');
+        return res.redirect('/error.html');
+    }
+    usedCodes.add(code);
 
     try {
         const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
@@ -116,7 +130,8 @@ router.get('/callback', async (req, res) => {
 
     } catch (error) {
         console.error('OAuth Error:', error.response?.data || error.message);
-        res.status(500).send(`Authentication failed: ${JSON.stringify(error.response?.data || error.message)}`);
+        // Do not return 500 JSON, redirect to error page to prevent reload loops
+        res.redirect('/error.html');
     }
 });
 
