@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static('public'));
+app.set('trust proxy', 1); // Render/Cloudflareのプロキシを信頼する
 app.use(cookieParser());
 
 // Mount Routes
