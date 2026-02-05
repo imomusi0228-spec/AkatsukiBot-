@@ -63,6 +63,7 @@ router.get('/login', (req, res) => {
         scope: 'identify guilds',
         state: state
     });
+    console.log('[OAuth] Login initiated. Redirect URI:', REDIRECT_URI);
     res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
 
