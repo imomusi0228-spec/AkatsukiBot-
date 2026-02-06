@@ -16,6 +16,10 @@ const client = new Client({
     ],
 });
 
+// Debug Logging
+client.on('debug', info => console.log(`[Discord Debug] ${info}`));
+
+
 // Presence Helper
 const setBotPresence = () => {
     if (client.user) {
@@ -90,8 +94,9 @@ async function main() {
         if (!process.env.DISCORD_TOKEN) {
             throw new Error('DISCORD_TOKEN is missing from environment variables!');
         }
+        const token = process.env.DISCORD_TOKEN.trim();
         console.log('[Discord] Attempting login...');
-        await client.login(process.env.DISCORD_TOKEN);
+        await client.login(token);
         console.log('[Discord] Login call completed (waiting for ClientReady).');
 
     } catch (error) {
