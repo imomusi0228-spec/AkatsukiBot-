@@ -91,6 +91,9 @@ async function main() {
             throw new Error('DISCORD_TOKEN is missing from environment variables!');
         }
         console.log('[Discord] Attempting login...');
+        if (process.env.DISCORD_TOKEN) {
+            console.log(`[Discord] Token suffix: ...${process.env.DISCORD_TOKEN.slice(-5)}`);
+        }
         await client.login(process.env.DISCORD_TOKEN);
         console.log('[Discord] Login call completed (waiting for ClientReady).');
 
