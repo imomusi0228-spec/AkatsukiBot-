@@ -95,6 +95,12 @@ async function main() {
             throw new Error('DISCORD_TOKEN is missing from environment variables!');
         }
         const token = process.env.DISCORD_TOKEN.trim();
+
+        // DEBUG: Token Validation Log
+        const tokenLength = token.length;
+        const tokenStart = token.substring(0, 5);
+        console.log(`[Debug] Token check: Length=${tokenLength}, StartsWith=${tokenStart}...`);
+
         console.log('[Discord] Attempting login...');
         await client.login(token);
         console.log('[Discord] Login call completed (waiting for ClientReady).');
