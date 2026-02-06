@@ -14,6 +14,9 @@ app.use(express.static('public'));
 app.set('trust proxy', 1); // Render/Cloudflareのプロキシを信頼する
 app.use(cookieParser());
 
+// Health Check Endpoint (Keep-Alive)
+app.get('/health', (req, res) => res.sendStatus(200));
+
 // Mount Routes
 app.use('/api/auth', authRoutes.router);
 app.use('/api/subscriptions', subscriptionRoutes);

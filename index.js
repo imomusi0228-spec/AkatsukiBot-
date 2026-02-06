@@ -73,8 +73,9 @@ async function main() {
         const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
         if (PUBLIC_URL) {
             console.log(`[Keep-Alive] Configured for: ${PUBLIC_URL}`);
+            const pingUrl = new URL('/health', PUBLIC_URL).toString();
             const pingSelf = () => {
-                fetch(PUBLIC_URL)
+                fetch(pingUrl)
                     .then(res => {
                         if (res.ok) console.log(`[Keep-Alive] Ping successful: ${res.status}`);
                         else console.warn(`[Keep-Alive] Ping returned status: ${res.status}`);
