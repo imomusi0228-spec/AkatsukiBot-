@@ -12,7 +12,7 @@ console.log('>>> Starting Bot Application...');
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
+        // GatewayIntentBits.GuildMembers, // Temporarily disabled to check if this is causing the connection hang
     ],
 });
 
