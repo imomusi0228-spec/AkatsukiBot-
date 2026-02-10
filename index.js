@@ -15,8 +15,8 @@ envVars.forEach(key => {
     const val = process.env[key];
     console.log(`[Env] ${key}: ${val ? (key.includes('TOKEN') || key.includes('SECRET') || key.includes('URL') ? (val.length > 10 ? val.substring(0, 5) + '...' : '***') : val) : 'MISSING'}`);
 });
-const { initDB } = require('./db');
-const { commands, adminCommands, publicCommands, handleInteraction } = require('./commands');
+const db = require('./db');
+const { commands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
 const { checkExpirations } = require('./expiry');
 const { startServer } = require('./server');
@@ -33,8 +33,10 @@ const client = new Client({
     ],
 });
 
-// Debug Logging
-client.on('debug', info => console.log(`[Discord Debug] ${info}`));
+// Debug Logging (Optional)
+if (process.env.DEBUG_DISCORD === 'true') {
+    client.on('debug', info => console.log(`[Discord Debug] ${info}`));
+}
 
 
 // Presence Helper
@@ -52,21 +54,20 @@ client.once(Events.ClientReady, async () => {
     console.log(`>>> [Discord] Logged in as ${client.user.tag}!`);
     setBotPresence();
 
-    console.log('[Discord] Skipping command registration on startup. Use "npm run register" if changes are needed.');
+    // Start background tasks
+    const runBackgroundTasks = async () => {
+        try {
+            console.log('[Background] Running sync and expiry check...');
+            await syncSubscriptions(client);
+            await checkExpirations(client);
+        } catch (err) {
+            console.error('[Background] Tasks failed:', err.message);
+        }
+    };
 
-    // Start heavier background tasks AFTER login
-    try {
-        console.log('[Background] Starting initial sync and expiry check...');
-        await syncSubscriptions(client);
-        await checkExpirations(client);
-
-        // Schedule periodic tasks
-        setInterval(() => syncSubscriptions(client), 300000); // 5 mins
-        setInterval(() => checkExpirations(client), 300000); // 5 mins
-        console.log('[Background] Periodic tasks scheduled.');
-    } catch (err) {
-        console.error('[Background] Error in background tasks:', err);
-    }
+    runBackgroundTasks();
+    setInterval(runBackgroundTasks, 300000); // 5 mins
+    console.log('[Background] Periodic tasks scheduled (5m).');
 });
 
 client.on('interactionCreate', handleInteraction);

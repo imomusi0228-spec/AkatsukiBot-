@@ -69,14 +69,21 @@ async function syncSubscriptions(client) {
         return { success: false, message: 'Support guild not found.' };
     }
 
-    // Fetch all members
+    // Fetch members with relevant roles only to stay lightweight
     let members;
     try {
-        members = await guild.members.fetch();
-        console.log(`Fetched ${members.size} members for sync.`);
+        const roleIds = Object.values(ROLES).filter(id => id);
+        if (roleIds.length === 0) {
+            members = await guild.members.fetch(); // Fallback if no roles defined
+        } else {
+            // Fetch only users who have at least one subscription role
+            members = await guild.members.fetch({ force: true });
+            members = members.filter(m => roleIds.some(rId => m.roles.cache.has(rId)));
+        }
+        console.log(`Fetched ${members.size} subscribed members for sync.`);
     } catch (fetchError) {
         console.error('Failed to fetch members for sync:', fetchError);
-        return { success: false, message: 'Failed to fetch members (possibly Rate Limited).', error: fetchError };
+        return { success: false, message: 'Failed to fetch members.', error: fetchError };
     }
 
     let updatedCount = 0;
