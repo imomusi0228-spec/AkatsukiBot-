@@ -44,6 +44,20 @@ async function initDB() {
       );
     `);
 
+    // Ensure license_key column exists (migration for existing table)
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='applications' AND column_name='license_key') THEN
+            ALTER TABLE applications ADD COLUMN license_key VARCHAR(50);
+          END IF;
+        END $$;
+      `);
+    } catch (err) {
+      console.warn('[DB] Migration failed (license_key column might already exist):', err.message);
+    }
+
     // user_sessions table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
