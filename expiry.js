@@ -50,18 +50,15 @@ async function checkExpirations(client) {
 
 
             // 2. Update DB to Free
-            // We clear expiry_date because Free doesn't expire (or we could set it to null)
+            // We clear expiry_date because Free doesn't expire
             await db.query(`
                 UPDATE subscriptions 
-                SET plan_tier = 'Free', expiry_date = NULL, notes = COALESCE(notes, '') || E'\\n[Auto] Expired to Free' 
+                SET plan_tier = 'Free', expiry_date = NULL 
                 WHERE server_id = $1
             `, [sub.server_id]);
 
             // 3. Log
-            await db.query(`
-                INSERT INTO subscription_logs (server_id, action, details) 
-                VALUES ($1, $2, $3)
-            `, [sub.server_id, 'EXPIRED_AUTO', `Downgraded to Free from ${sub.plan_tier}`]);
+            // Removed reference to subscription_logs which was deleted.
         }
         console.log(`Processed ${res.rows.length} expired subscriptions.`);
 

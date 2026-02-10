@@ -11,6 +11,24 @@ const pool = new Pool({
 async function initDB() {
   const client = await pool.connect();
   try {
+    // 1. Rename columns if necessary (migration)
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN 
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='guild_id') THEN
+            ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id;
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='tier') THEN
+            ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier;
+          END IF;
+        END $$;
+      `);
+      console.log('[DB] Column rename migration completed.');
+    } catch (err) {
+      console.warn('[DB] Migration error (renaming):', err.message);
+    }
+
     // subscriptions table
     await client.query(`
       CREATE TABLE IF NOT EXISTS subscriptions (

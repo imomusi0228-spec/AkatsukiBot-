@@ -98,11 +98,9 @@ async function syncSubscriptions(client) {
                     for (const row of res.rows) {
                         if (row.plan_tier !== tier || !row.is_active) {
                             await db.query(
-                                'UPDATE subscriptions SET plan_tier = $1, is_active = TRUE, notes = COALESCE(notes, \'\') || E\'\\n[Auto-Sync] Reactivated/Updated\' WHERE server_id = $2',
+                                'UPDATE subscriptions SET plan_tier = $1, is_active = TRUE WHERE server_id = $2',
                                 [tier, row.server_id]
                             );
-                            await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
-                                [row.server_id, 'SYNC_UPDATE', `Updated to ${tier} (is_active: true) via Role Sync`]);
                             updatedCount++;
                         }
                     }
