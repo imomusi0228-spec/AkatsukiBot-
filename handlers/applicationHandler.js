@@ -1,4 +1,5 @@
 const db = require('../db');
+const crypto = require('crypto');
 
 const APPLICATION_CHANNEL_ID = process.env.APPLICATION_CHANNEL_ID;
 
@@ -40,11 +41,22 @@ async function handleApplicationMessage(message, client) {
             return;
         }
 
+        // Generate license key
+        const randomBuffer = crypto.randomBytes(4);
+        const key = `AK-${randomBuffer.toString('hex').toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+        // Save license key to database
+        await db.query(
+            `INSERT INTO license_keys (key_id, plan_tier, duration_months, notes)
+            VALUES ($1, $2, $3, $4)`,
+            [key, parsed.tier, 1, `Auto-generated for ${message.author.tag}`]
+        );
+
         // Save application to database
         const result = await db.query(
-            `INSERT INTO applications 
-            (message_id, channel_id, author_id, author_name, content, parsed_user_id, parsed_server_id, parsed_tier, parsed_booth_name, status, auto_processed) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+            `INSERT INTO applications
+            (message_id, channel_id, author_id, author_name, content, parsed_user_id, parsed_server_id, parsed_tier, parsed_booth_name, status, auto_processed, license_key)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id`,
             [
                 message.id,
@@ -56,62 +68,20 @@ async function handleApplicationMessage(message, client) {
                 parsed.serverId,
                 parsed.tier,
                 parsed.boothName,
-                'pending',
-                false
+                'approved',
+                true,
+                key
             ]
         );
 
         const applicationId = result.rows[0].id;
-        console.log(`[Application] Saved application ID: ${applicationId}`);
+        console.log(`[Application] Auto-approved application ID: ${applicationId}, License Key: ${key}`);
 
-        // Check if this is an existing user (by user_id)
-        const existingSub = await db.query(
-            'SELECT server_id, expiry_date, plan_tier FROM subscriptions WHERE user_id = $1',
-            [parsed.userId]
-        );
-
-        if (existingSub.rows.length > 0) {
-            // Existing user - auto extend
-            console.log(`[Application] Existing user detected: ${parsed.userId}`);
-
-            const currentSub = existingSub.rows[0];
-            let currentExpiry = currentSub.expiry_date ? new Date(currentSub.expiry_date) : new Date();
-            if (currentExpiry < new Date()) currentExpiry = new Date();
-
-            // Extend by 1 month
-            currentExpiry.setMonth(currentExpiry.getMonth() + 1);
-
-            await db.query(
-                'UPDATE subscriptions SET expiry_date = $1, is_active = TRUE WHERE user_id = $2',
-                [currentExpiry, parsed.userId]
-            );
-
-            // Update application status
-            await db.query(
-                'UPDATE applications SET status = $1, auto_processed = $2 WHERE id = $3',
-                ['approved', true, applicationId]
-            );
-
-            console.log(`[Application] Auto-extended subscription for user ${parsed.userId} to ${currentExpiry}`);
-
-            // Send DM to user (only visible to admin/user)
-            try {
-                const user = await client.users.fetch(message.author.id);
-                await user.send(`✅ サブスクリプションを自動延長しました!\n有効期限: ${currentExpiry.toLocaleDateString('ja-JP')}`);
-            } catch (e) {
-                console.error('[Application] Failed to send DM:', e);
-            }
-
-        } else {
-            // New user - manual approval required
-            console.log(`[Application] New user detected: ${parsed.userId} - manual approval required`);
-
-            // Send notification message
-            try {
-                await message.reply(`📋 申請を受け付けました。管理者による承認をお待ちください。`);
-            } catch (e) {
-                console.error('[Application] Failed to send reply:', e);
-            }
+        // Send notification message
+        try {
+            await message.reply(`📋 申請を受け付けました。\nライセンスキーはBoothメッセージで送信されます。\nキーを受け取ったら \`/activate server_id:${parsed.serverId} key:キー\` で有効化してください。`);
+        } catch (e) {
+            console.error('[Application] Failed to send reply:', e);
         }
 
     } catch (error) {

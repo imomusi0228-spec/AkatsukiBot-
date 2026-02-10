@@ -39,6 +39,7 @@ async function initDB() {
         parsed_booth_name VARCHAR(255),
         status VARCHAR(50) DEFAULT 'pending',
         auto_processed BOOLEAN DEFAULT FALSE,
+        license_key VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
