@@ -62,11 +62,19 @@ async function updateMemberRoles(guild, userId, tier) {
  */
 async function syncSubscriptions(client) {
     console.log('Starting subscription sync...');
+    console.log('[Debug] Current Configured ROLES:', JSON.stringify(ROLES, null, 2));
+
     const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(console.error);
     if (!guild) {
         console.error(`Support guild ${SUPPORT_GUILD_ID} not found.`);
         return { success: false, message: 'Support guild not found.' };
     }
+
+    // Role ID Debug: List all roles in the guild
+    console.log('[Debug] Roles available in guild:');
+    guild.roles.cache.forEach(role => {
+        console.log(`[Role] Name: ${role.name}, ID: ${role.id}`);
+    });
 
     // Fetch all members
     let members;
@@ -83,11 +91,18 @@ async function syncSubscriptions(client) {
     let errors = [];
 
     for (const [memberId, member] of members) {
+        // Detailed log for specific users if needed, but let's see which roles they have
+        const rolesInMember = member.roles.cache.map(r => r.id);
+
         let tier = 'Free';
         if (member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
             tier = 'Pro+';
         } else if (member.roles.cache.has(ROLES['ProYearly']) || member.roles.cache.has(ROLES['ProMonthly'])) {
             tier = 'Pro';
+        }
+
+        if (member.user.tag.includes('shino')) {
+            console.log(`[Debug] Checking Shino: Tier=${tier}, Roles=[${rolesInMember.join(', ')}]`);
         }
 
         if (tier !== 'Free') {
@@ -108,19 +123,13 @@ async function syncSubscriptions(client) {
                     }
                 }
             } catch (err) {
-                console.error(`Error syncing user ${memberId}:`, err);
+                console.error(`[Sync] Error syncing user ${memberId}:`, err);
                 errors.push(`Error syncing ${member.user.tag}`);
             }
         } else {
-            const res = await db.query('SELECT server_id, plan_tier FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [memberId]);
-            for (const row of res.rows) {
-                if (row.plan_tier === 'Pro' || row.plan_tier === 'Pro+') {
-                    await db.query('UPDATE subscriptions SET is_active = FALSE, notes = COALESCE(notes, \'\') || E\'\\n[Auto-Sync] Role removed\' WHERE server_id = $1', [row.server_id]);
-                    await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
-                        [row.server_id, 'SYNC_CANCEL', 'Role removed, subscription deactivated']);
-                    updatedCount++;
-                }
-            }
+            // [Safety] We NO LONGER automatically deactivate subscriptions if role is not found.
+            // This prevents accidental deactivation due to cache issues or bot permission problems.
+            // If you want to handle "Unsub" logic, it should be done based on Expiry Date or explicit cancel.
         }
     }
 
