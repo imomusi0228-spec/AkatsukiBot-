@@ -249,6 +249,7 @@
 
                     <hr>
                     <button class="btn btn-danger w-100 mb-2" onclick="cancelSub()">サブスクリプションキャンセル</button>
+                    <button class="btn btn-outline-danger w-100" onclick="deleteSub()">完全削除</button>
                 </div>
             </div>
         </div>
@@ -451,6 +452,16 @@
             if (!confirm('本当にキャンセルしますか？')) return;
             const id = document.getElementById('editServerId').value;
             const res = await apiRequest(`/subscriptions/${id}`, 'DELETE');
+            if (res && res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+                fetchSubscriptions();
+            }
+        }
+
+        async function deleteSub() {
+            if (!confirm('本当に完全削除しますか？この操作は取り消せません。')) return;
+            const id = document.getElementById('editServerId').value;
+            const res = await apiRequest(`/subscriptions/${id}/delete`, 'DELETE');
             if (res && res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
                 fetchSubscriptions();

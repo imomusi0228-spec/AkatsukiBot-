@@ -94,11 +94,12 @@ async function handleApplicationMessage(message, client) {
 
             console.log(`[Application] Auto-extended subscription for user ${parsed.userId} to ${currentExpiry}`);
 
-            // Send confirmation message
+            // Send DM to user (only visible to admin/user)
             try {
-                await message.reply(`✅ サブスクリプションを自動延長しました！\n有効期限: ${currentExpiry.toLocaleDateString('ja-JP')}`);
+                const user = await client.users.fetch(message.author.id);
+                await user.send(`✅ サブスクリプションを自動延長しました!\n有効期限: ${currentExpiry.toLocaleDateString('ja-JP')}`);
             } catch (e) {
-                console.error('[Application] Failed to send reply:', e);
+                console.error('[Application] Failed to send DM:', e);
             }
 
         } else {

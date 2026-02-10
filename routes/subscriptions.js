@@ -132,4 +132,15 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// DELETE /api/subscriptions/:id/delete - Complete deletion
+router.delete('/:id/delete', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM subscriptions WHERE server_id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
