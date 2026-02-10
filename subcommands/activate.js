@@ -22,6 +22,10 @@ module.exports = async (interaction) => {
         return interaction.editReply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。' });
     }
 
+    if (!inputKey) {
+        return interaction.editReply({ content: '❌ **ライセンスキーを入力してください。**\nBOOTHで送られたキーが必要です。' });
+    }
+
     if (!/^\d{17,20}$/.test(serverId)) {
         return interaction.editReply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。' });
     }
@@ -50,41 +54,11 @@ module.exports = async (interaction) => {
         }
     }
 
-    // --- 2. Role Verification (Fallback) ---
-    if (!tier) {
-        const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
-        if (!SUPPORT_GUILD_ID) {
-            console.error('SUPPORT_GUILD_ID is not set in .env');
-        } else {
-            let supportMember = null;
-            try {
-                const supportGuild = await interaction.client.guilds.fetch(SUPPORT_GUILD_ID);
-                supportMember = await supportGuild.members.fetch({ user: userId, force: true });
-            } catch (err) {
-                console.warn(`Failed to fetch member ${userId} from support guild: ${err.message}`);
-            }
-
-            if (supportMember) {
-                if (supportMember.roles.cache.has(ROLES['ProPlusYearly'])) {
-                    tier = 'Pro+';
-                    durationMonths = 12;
-                } else if (supportMember.roles.cache.has(ROLES['ProPlusMonthly'])) {
-                    tier = 'Pro+';
-                    durationMonths = 1;
-                } else if (supportMember.roles.cache.has(ROLES['ProYearly'])) {
-                    tier = 'Pro';
-                    durationMonths = 12;
-                } else if (supportMember.roles.cache.has(ROLES['ProMonthly'])) {
-                    tier = 'Pro';
-                    durationMonths = 1;
-                }
-            }
-        }
-    }
+    // --- 2. Verification Cleanup (Removed Role Fallback) ---
 
     if (!tier) {
         return interaction.editReply({
-            content: `❌ **有効なサブスクリプションまたはロールが見つかりませんでした。**\n\nキーをお持ちの場合は入力してください。\nロールによる有効化の場合は、サポートサーバーに参加し、支援者ロールが付与されている必要があります。`
+            content: `❌ **有効なサブスクリプションが見つかりませんでした。**\n\n入力されたキーが正しいか確認してください。\nライセンスの適用には、管理者から発行されたキーが必須です。`
         });
     }
 
@@ -111,7 +85,7 @@ module.exports = async (interaction) => {
                 expiry_date = EXCLUDED.expiry_date, 
                 is_active = TRUE,
                 notes = COALESCE(subscriptions.notes, '') || E'\\n[Activate] ' || $5
-        `, [serverId, userId, tier, exp, usedKey ? `Used Key: ${usedKey}` : 'Role sync']);
+        `, [serverId, userId, tier, exp, `Used Key: ${usedKey}`]);
 
         if (usedKey) {
             await db.query('UPDATE license_keys SET is_used = TRUE, used_by_user = $1, used_at = CURRENT_TIMESTAMP WHERE key_id = $2', [userId, usedKey]);
@@ -130,9 +104,9 @@ module.exports = async (interaction) => {
         }
 
         await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
-            [serverId, 'ACTIVATE', `Tier: ${tier}, Exp: ${exp.toLocaleDateString()}, Method: ${usedKey ? 'Key' : 'Role'}`]);
+            [serverId, 'ACTIVATE', `Tier: ${tier}, Exp: ${exp.toLocaleDateString()}, Method: Key (${usedKey})`]);
 
-        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ${usedKey ? 'ライセンスキー' : 'ロール同期'}\n\nサポートサーバーのロールも同期されました。` });
+        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
 
     } catch (err) {
         console.error(err);
