@@ -33,11 +33,7 @@ module.exports = async (interaction) => {
     // --- 1. Key Verification (Priority) ---
     if (inputKey) {
         try {
-            const keyRes = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_active = TRUE AND is_used = FALSE', [inputKey.trim().toUpperCase()]);
-            // (Note: database schema might have key_id or just key. Using key_id based on db.js edit)
-            // Wait, check db.js edit again. Yes, key_id.
-
-            // Re-checking the typo in my query (is_active is not in license_keys if I check my previous edit)
+            // Check if the key exists and is not used
             const keyCheck = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_used = FALSE', [inputKey.trim().toUpperCase()]);
 
             if (keyCheck.rows.length > 0) {
