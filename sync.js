@@ -92,17 +92,17 @@ async function syncSubscriptions(client) {
 
         if (tier !== 'Free') {
             try {
-                const res = await db.query('SELECT server_id, plan_tier FROM subscriptions WHERE user_id = $1', [memberId]);
+                const res = await db.query('SELECT server_id, plan_tier, is_active FROM subscriptions WHERE user_id = $1', [memberId]);
 
                 if (res.rows.length > 0) {
                     for (const row of res.rows) {
-                        if (row.plan_tier !== tier) {
+                        if (row.plan_tier !== tier || !row.is_active) {
                             await db.query(
-                                'UPDATE subscriptions SET plan_tier = $1, is_active = TRUE, notes = COALESCE(notes, \'\') || E\'\\n[Auto-Sync] Role update\' WHERE server_id = $2',
+                                'UPDATE subscriptions SET plan_tier = $1, is_active = TRUE, notes = COALESCE(notes, \'\') || E\'\\n[Auto-Sync] Reactivated/Updated\' WHERE server_id = $2',
                                 [tier, row.server_id]
                             );
                             await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
-                                [row.server_id, 'SYNC_UPDATE', `Updated to ${tier} via Role Sync`]);
+                                [row.server_id, 'SYNC_UPDATE', `Updated to ${tier} (is_active: true) via Role Sync`]);
                             updatedCount++;
                         }
                     }
