@@ -70,4 +70,16 @@ router.post('/:id/cancel', authMiddleware, async (req, res) => {
     }
 });
 
+// Delete application record
+router.delete('/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM applications WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 module.exports = router;
