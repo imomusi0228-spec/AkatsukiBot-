@@ -62,7 +62,6 @@ async function updateMemberRoles(guild, userId, tier) {
  */
 async function syncSubscriptions(client) {
     console.log('Starting subscription sync...');
-    console.log('[Debug] Current Configured ROLES:', JSON.stringify(ROLES, null, 2));
 
     const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(console.error);
     if (!guild) {
@@ -70,18 +69,11 @@ async function syncSubscriptions(client) {
         return { success: false, message: 'Support guild not found.' };
     }
 
-    // Role ID Debug: List all roles in the guild
-    console.log('[Debug] Roles available in guild:');
-    guild.roles.cache.forEach(role => {
-        console.log(`[Role] Name: ${role.name}, ID: ${role.id}`);
-    });
-
     // Fetch all members
     let members;
     try {
-        console.log(`Fetching all members for guild ${SUPPORT_GUILD_ID}...`);
         members = await guild.members.fetch();
-        console.log(`Fetched ${members.size} members.`);
+        console.log(`Fetched ${members.size} members for sync.`);
     } catch (fetchError) {
         console.error('Failed to fetch members for sync:', fetchError);
         return { success: false, message: 'Failed to fetch members (possibly Rate Limited).', error: fetchError };
@@ -91,18 +83,11 @@ async function syncSubscriptions(client) {
     let errors = [];
 
     for (const [memberId, member] of members) {
-        // Detailed log for specific users if needed, but let's see which roles they have
-        const rolesInMember = member.roles.cache.map(r => r.id);
-
         let tier = 'Free';
         if (member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
             tier = 'Pro+';
         } else if (member.roles.cache.has(ROLES['ProYearly']) || member.roles.cache.has(ROLES['ProMonthly'])) {
             tier = 'Pro';
-        }
-
-        if (member.user.tag.includes('shino')) {
-            console.log(`[Debug] Checking Shino: Tier=${tier}, Roles=[${rolesInMember.join(', ')}]`);
         }
 
         if (tier !== 'Free') {
