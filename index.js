@@ -28,6 +28,8 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
     ],
 });
 
@@ -68,6 +70,12 @@ client.once(Events.ClientReady, async () => {
 });
 
 client.on('interactionCreate', handleInteraction);
+
+client.on('messageCreate', async (message) => {
+    // Import handler here to avoid circular dependencies
+    const { handleApplicationMessage } = require('./handlers/applicationHandler');
+    await handleApplicationMessage(message, client);
+});
 
 client.on('error', error => console.error('[Discord] Client Error:', error));
 client.on('shardError', error => console.error('[Discord] WS Error:', error));

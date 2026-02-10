@@ -64,7 +64,6 @@ router.post('/', authMiddleware, async (req, res) => {
             'INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active) VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (server_id) DO UPDATE SET user_id = EXCLUDED.user_id, plan_tier = EXCLUDED.plan_tier, expiry_date = EXCLUDED.expiry_date, is_active = TRUE',
             [server_id, user_id, tier, expiryDate]
         );
-        await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [server_id, 'CREATE_WEB', `Tier: ${tier}, Exp: ${expiryDate}`]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -96,7 +95,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
             else if (unit === 'y') currentExpiry.setFullYear(currentExpiry.getFullYear() + amount);
 
             await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE WHERE server_id = $2', [currentExpiry, id]);
-            await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'EXTEND_WEB', `New Exp: ${currentExpiry}`]);
 
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
@@ -108,7 +106,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
             await db.query('UPDATE subscriptions SET plan_tier = $1 WHERE server_id = $2', [tier, id]);
-            await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'UPDATE_WEB', `Tier: ${tier}`]);
 
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
@@ -116,10 +113,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
             }
         } else if (action === 'toggle_active') {
             await db.query('UPDATE subscriptions SET is_active = $1 WHERE server_id = $2', [is_active, id]);
-            await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'UPDATE_WEB', `Active: ${is_active}`]);
-        }
-        else if (action === 'update_note') {
-            await db.query('UPDATE subscriptions SET notes = $1 WHERE server_id = $2', [notes, id]);
         }
 
         res.json({ success: true });
@@ -133,18 +126,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
         await db.query('UPDATE subscriptions SET is_active = FALSE WHERE server_id = $1', [id]);
-        await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)', [id, 'CANCEL_WEB', 'Cancelled manually']);
         res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// GET /api/logs (Moved here since it's related to sub management)
-router.get('/logs', authMiddleware, async (req, res) => {
-    try {
-        const result = await db.query('SELECT * FROM subscription_logs ORDER BY created_at DESC LIMIT 100');
-        res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

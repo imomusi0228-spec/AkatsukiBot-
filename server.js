@@ -5,6 +5,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth'); // Imports { router, authMiddleware }
 const subscriptionRoutes = require('./routes/subscriptions');
 const miscRoutes = require('./routes/misc');
+const applicationRoutes = require('./routes/applications');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,7 +21,8 @@ app.get('/health', (req, res) => res.sendStatus(200));
 // Mount Routes
 app.use('/api/auth', authRoutes.router);
 app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api', miscRoutes); // mounts /api/sync, /api/applications
+app.use('/api/applications', applicationRoutes);
+app.use('/api', miscRoutes); // mounts /api/sync
 
 function startServer(client) {
     app.discordClient = client;

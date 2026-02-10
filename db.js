@@ -20,18 +20,25 @@ async function initDB() {
         start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expiry_date TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE,
-        auto_renew BOOLEAN DEFAULT FALSE,
-        notes TEXT
+        auto_renew BOOLEAN DEFAULT FALSE
       );
     `);
 
-    // subscription_logs table
+    // applications table
     await client.query(`
-      CREATE TABLE IF NOT EXISTS subscription_logs (
+      CREATE TABLE IF NOT EXISTS applications (
         id SERIAL PRIMARY KEY,
-        server_id VARCHAR(255) NOT NULL,
-        action VARCHAR(50) NOT NULL,
-        details TEXT,
+        message_id VARCHAR(255) UNIQUE NOT NULL,
+        channel_id VARCHAR(255) NOT NULL,
+        author_id VARCHAR(255) NOT NULL,
+        author_name VARCHAR(255),
+        content TEXT,
+        parsed_user_id VARCHAR(255),
+        parsed_server_id VARCHAR(255),
+        parsed_tier VARCHAR(50),
+        parsed_booth_name VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'pending',
+        auto_processed BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
