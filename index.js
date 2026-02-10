@@ -91,6 +91,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
     console.log(`[Discord] Member joined support guild: ${member.user.tag}`);
     try {
+        // 1. Assign initial "User" role
+        const initialRoleId = process.env.ROLE_USER_ID;
+        if (initialRoleId) {
+            await member.roles.add(initialRoleId).catch(e => console.error('[Discord] Failed to add User role:', e));
+        }
+
         const res = await db.query('SELECT plan_tier FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [member.id]);
         if (res.rows.length > 0) {
             // Find highest tier
