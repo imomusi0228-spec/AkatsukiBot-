@@ -85,6 +85,27 @@ client.on('shardReady', (id) => {
     setBotPresence();
 });
 
+// Auto Role sync on Member Join
+client.on(Events.GuildMemberAdd, async (member) => {
+    if (member.guild.id !== process.env.SUPPORT_GUILD_ID) return;
+
+    console.log(`[Discord] Member joined support guild: ${member.user.tag}`);
+    try {
+        const res = await db.query('SELECT plan_tier FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [member.id]);
+        if (res.rows.length > 0) {
+            // Find highest tier
+            let tier = 'Pro';
+            if (res.rows.some(r => r.plan_tier === 'Pro+')) tier = 'Pro+';
+
+            const { updateMemberRoles } = require('./sync');
+            await updateMemberRoles(member.guild, member.id, tier);
+            console.log(`[Discord] Auto-assigned ${tier} role to joined member ${member.user.tag}`);
+        }
+    } catch (err) {
+        console.error('[Discord] Error in auto-role assignment on join:', err);
+    }
+});
+
 // Main Startup Flow
 async function main() {
     try {

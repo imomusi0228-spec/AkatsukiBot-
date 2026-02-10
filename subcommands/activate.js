@@ -117,10 +117,22 @@ module.exports = async (interaction) => {
             await db.query('UPDATE license_keys SET is_used = TRUE, used_by_user = $1, used_at = CURRENT_TIMESTAMP WHERE key_id = $2', [userId, usedKey]);
         }
 
+        // --- 4. Immediate Role Sync ---
+        const { updateMemberRoles } = require('../sync');
+        const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
+        if (SUPPORT_GUILD_ID) {
+            try {
+                const supportGuild = await interaction.client.guilds.fetch(SUPPORT_GUILD_ID);
+                await updateMemberRoles(supportGuild, userId, tier);
+            } catch (err) {
+                console.error('[Activate] Failed to sync roles immediately:', err);
+            }
+        }
+
         await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
             [serverId, 'ACTIVATE', `Tier: ${tier}, Exp: ${exp.toLocaleDateString()}, Method: ${usedKey ? 'Key' : 'Role'}`]);
 
-        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ${usedKey ? 'ライセンスキー' : 'ロール同期'}` });
+        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ${usedKey ? 'ライセンスキー' : 'ロール同期'}\n\nサポートサーバーのロールも同期されました。` });
 
     } catch (err) {
         console.error(err);
