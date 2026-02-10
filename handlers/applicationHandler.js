@@ -44,10 +44,11 @@ async function handleApplicationMessage(message, client) {
 }
 
 function parseApplication(content) {
-    const boothMatch = content.match(/購入者名\(BOOTH\):\s*(.+)/);
-    const userMatch = content.match(/ユーザーID:\s*(\d+)/);
-    const serverMatch = content.match(/サーバーID:\s*(\d+)/);
-    const tierMatch = content.match(/希望プラン\(Pro\s*\/\s*Pro\+\):\s*(Pro\+?)/i);
+    // Handling both full-width and half-width symbols (brackets, colons)
+    const boothMatch = content.match(/[購入者名][(（]BOOTH[)）][:：]\s*(.+)/);
+    const userMatch = content.match(/ユーザーID[:：]\s*(\d+)/);
+    const serverMatch = content.match(/サーバーID[:：]\s*(\d+)/);
+    const tierMatch = content.match(/希望プラン[(（]Pro\s*[\/\s]*Pro\+[)）][:：]\s*(Pro\+?)/i);
 
     if (!userMatch || !serverMatch || !tierMatch) return null;
 
