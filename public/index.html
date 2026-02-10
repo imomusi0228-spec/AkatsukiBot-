@@ -105,6 +105,16 @@
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div id="userInfo" class="text-white small"></div>
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="subs-tab" data-bs-toggle="tab" data-bs-target="#subs"
+                            type="button" role="tab">サブスクリプション</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="apps-tab" data-bs-toggle="tab" data-bs-target="#apps" type="button"
+                            role="tab">申請一覧</button>
+                    </li>
+                </ul>
             </div>
         </div>
 
@@ -295,6 +305,7 @@
             }
 
             fetchSubscriptions();
+            fetchApps();
         }
 
         async function apiRequest(endpoint, method = 'GET', body = null) {
