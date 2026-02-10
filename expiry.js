@@ -12,7 +12,7 @@ async function checkExpirations(client) {
     try {
         const res = await db.query(`
             SELECT * FROM subscriptions 
-            WHERE (plan_tier != 'Free' OR plan_tier IS NULL)
+            WHERE plan_tier != 'Free'
             AND is_active = TRUE 
             AND expiry_date IS NOT NULL 
             AND expiry_date < NOW()
@@ -30,7 +30,7 @@ async function checkExpirations(client) {
         }
 
         for (const sub of res.rows) {
-            const sId = sub.server_id || sub.guild_id;
+            const sId = sub.server_id;
             console.log(`Processing expiry for Server: ${sId}, User: ${sub.user_id}`);
 
             // 1. Remove Roles & Notify
@@ -55,15 +55,8 @@ async function checkExpirations(client) {
                 await db.query(`
                     UPDATE subscriptions 
                     SET plan_tier = 'Free', expiry_date = NULL 
-                    WHERE server_id = $1 OR guild_id = $1
-                `, [sId]).catch(async () => {
-                    // Absolute fallback if plan_tier doesn't exist
-                    await db.query(`
-                        UPDATE subscriptions 
-                        SET tier = 'Free', expiry_date = NULL 
-                        WHERE guild_id = $1 OR server_id = $1
-                    `, [sId]);
-                });
+                    WHERE server_id = $1
+                `, [sId]);
             } catch (err) {
                 console.error(`[Expiry] DB update failed for ${sId}:`, err.message);
             }

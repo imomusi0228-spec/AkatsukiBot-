@@ -11,30 +11,32 @@ const pool = new Pool({
 async function initDB() {
   const client = await pool.connect();
   try {
-    // 1. Rename columns if necessary (migration)
+    // 1. Migration: guild_id -> server_id
     try {
-      await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
-      console.log('[DB] Renamed guild_id to server_id');
-    } catch (e) {
-      if (e.code === '42704') { // undefined_object = column not found (already renamed)
-        // valid state
-      } else if (e.code === '42701') { // duplicate_column (target exists)
-        // valid state
-      } else {
-        console.warn('[DB] Migration Check (guild_id->server_id):', e.message);
+      const res = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'subscriptions' AND column_name = 'guild_id'
+      `);
+      if (res.rows.length > 0) {
+        await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
+        console.log('[DB] Migrated guild_id to server_id');
       }
+    } catch (e) {
+      console.error('[DB] Guild ID Migration Error:', e.message);
     }
+
+    // 2. Migration: tier -> plan_tier
     try {
-      await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
-      console.log('[DB] Renamed tier to plan_tier');
-    } catch (e) {
-      if (e.code === '42704') {
-        // valid state
-      } else if (e.code === '42701') {
-        // valid state
-      } else {
-        console.warn('[DB] Migration Check (tier->plan_tier):', e.message);
+      const res = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'subscriptions' AND column_name = 'tier'
+      `);
+      if (res.rows.length > 0) {
+        await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
+        console.log('[DB] Migrated tier to plan_tier');
       }
+    } catch (e) {
+      console.error('[DB] Tier Migration Error:', e.message);
     }
 
     // subscriptions table

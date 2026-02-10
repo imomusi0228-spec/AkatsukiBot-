@@ -99,24 +99,16 @@ async function syncSubscriptions(client) {
                         if (row.plan_tier !== tier || !row.is_active) {
                             try {
                                 // Identify correct server ID from row
-                                const sId = row.server_id || row.guild_id;
+                                const sId = row.server_id;
 
-                                // Use a more dynamic approach or just support both for the update
-                                // Since we prioritize plan_tier, we update it and fallback to tier.
-                                // The most robust way is to check the columns first (cached) or just use logic.
                                 await db.query(
                                     `UPDATE subscriptions SET 
                                     plan_tier = $1,
                                     is_active = TRUE 
                                  WHERE server_id = $2`,
                                     [tier, sId]
-                                ).catch(async (err) => {
-                                    console.error(`[Sync] Primary update failed for ${sId}, trying fallback:`, err.message);
-                                    // Fallback to 'guild_id' if server_id fails (unlikely after fixSchema)
-                                    await db.query(
-                                        'UPDATE subscriptions SET tier = $1, is_active = TRUE WHERE guild_id = $2',
-                                        [tier, sId]
-                                    ).catch(e => console.error('[Sync] Fallback update failed:', e.message));
+                                ).catch((err) => {
+                                    console.error(`[Sync] Update failed for ${sId}:`, err.message);
                                 });
                                 updatedCount++;
                             } catch (err) {
