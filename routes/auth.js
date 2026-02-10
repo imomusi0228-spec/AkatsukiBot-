@@ -9,8 +9,10 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 const DISCORD_CLIENT_ID = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const PORT = process.env.PORT || 3000;
-const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+const PUBLIC_URL = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const REDIRECT_URI = `${PUBLIC_URL}/api/auth/callback`;
+
+console.log(`[OAuth] Configured REDIRECT_URI: ${REDIRECT_URI}`);
 
 // Cache for used codes to prevent replay attacks and rate limits
 const usedCodes = new Set();
