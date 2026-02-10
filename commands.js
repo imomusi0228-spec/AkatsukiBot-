@@ -30,10 +30,7 @@ const publicCommands = [
         .addStringOption(option =>
             option.setName('server_id').setDescription('サーバーID (サーバー内で使用する場合は省略可)').setRequired(false))
         .addStringOption(option =>
-            option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false)),
-    new SlashCommandBuilder()
-        .setName('ping')
-        .setDescription('Botの生存確認を行います')
+            option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false))
 ];
 
 const commands = [...adminCommands, ...publicCommands];
@@ -50,7 +47,7 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['sync', 'activate', 'setup_vc', 'generate_key', 'ping'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'setup_vc', 'generate_key'].includes(interaction.commandName)) {
         try {
             const commandHandler = require(`./subcommands/${interaction.commandName}`);
             await commandHandler(interaction);
