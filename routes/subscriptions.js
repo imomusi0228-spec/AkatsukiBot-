@@ -16,25 +16,38 @@ router.get('/', authMiddleware, async (req, res) => {
             const enrichedSubs = await Promise.all(subs.map(async sub => {
                 let serverName = 'Unknown Server';
                 let userName = 'Unknown User';
+                let userHandle = 'unknown';
 
                 try {
-                    const guild = await client.guilds.fetch(sub.server_id).catch(() => null);
-                    if (guild) serverName = guild.name;
+                    // Fetch Guild Name
+                    if (sub.server_id) {
+                        const guild = await client.guilds.fetch(sub.server_id).catch(() => null);
+                        if (guild) serverName = guild.name;
+                    }
 
-                    const user = await client.users.fetch(sub.user_id).catch(() => null);
-                    if (user) {
-                        return {
-                            ...sub,
-                            server_name: serverName,
-                            user_display_name: user.globalName || user.username,
-                            user_handle: user.username
-                        };
+                    // Fetch User Name
+                    if (sub.user_id) {
+                        const user = await client.users.fetch(sub.user_id).catch(() => null);
+                        if (user) {
+                            userName = user.globalName || user.username;
+                            userHandle = user.username;
+                        }
                     }
                 } catch (e) {
-                    // console.warn(`Failed to fetch names: ${e.message}`);
+                    console.warn(`[Enrichment] Failed for server ${sub.server_id}: ${e.message}`);
                 }
 
-                return { ...sub, server_name: serverName, user_display_name: 'Unknown', user_handle: 'unknown' };
+                // Explicitly return all fields plus enriched data
+                return {
+                    server_id: sub.server_id,
+                    user_id: sub.user_id,
+                    plan_tier: sub.plan_tier,
+                    expiry_date: sub.expiry_date,
+                    is_active: sub.is_active,
+                    server_name: serverName,
+                    user_display_name: userName,
+                    user_handle: userHandle
+                };
             }));
             res.json(enrichedSubs);
         } else {
