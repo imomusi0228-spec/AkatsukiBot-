@@ -64,6 +64,14 @@
             color: #f8f9fa;
             border-color: #86b7fe;
         }
+
+        .pointer-cursor {
+            cursor: pointer;
+        }
+
+        .app-detail-container {
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 
@@ -323,11 +331,14 @@
                             '<span class="badge bg-warning">保留中</span>';
 
                 const detailHtml = `
-                    <div class="small">
-                        <strong>BOOTH:</strong> <span class="text-info">${app.parsed_booth_name || '不明'}</span><br>
-                        <strong>Tier:</strong> <span class="badge bg-outline-primary border border-primary">${app.parsed_tier || '不明'}</span><br>
-                        <strong>Server ID:</strong> <code>${app.parsed_server_id || '不明'}</code><br>
-                        <strong>User ID:</strong> <code>${app.parsed_user_id || '不明'}</code>
+                    <div class="app-detail-container pointer-cursor" onclick="toggleDetails(${app.id})">
+                        <div class="fw-bold text-info">${app.parsed_booth_name || '不明'} <span class="small text-muted">▼</span></div>
+                        <div id="extra-details-${app.id}" class="small d-none mt-2 border-start border-info ps-2">
+                            <strong>BOOTH名:</strong> ${app.parsed_booth_name || '不明'}<br>
+                            <strong>Server ID:</strong> <code>${app.parsed_server_id || '不明'}</code><br>
+                            <strong>User ID:</strong> <code>${app.parsed_user_id || '不明'}</code><br>
+                            <strong>Tier:</strong> <span class="badge bg-outline-primary border border-primary">${app.parsed_tier || '不明'}</span>
+                        </div>
                     </div>
                 `;
 
@@ -371,6 +382,13 @@
             const res = await apiRequest(`/applications/${id}`, 'DELETE');
             if (res && res.success) {
                 fetchApps();
+            }
+        }
+
+        function toggleDetails(id) {
+            const el = document.getElementById(`extra-details-${id}`);
+            if (el) {
+                el.classList.toggle('d-none');
             }
         }
 
