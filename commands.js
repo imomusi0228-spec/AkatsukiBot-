@@ -9,17 +9,6 @@ const adminCommands = [
     new SlashCommandBuilder()
         .setName('setup_vc')
         .setDescription('サポートVC作成パネルを設置します')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
-        .setName('generate_key')
-        .setDescription('ワンタイムライセンスキーを発行します')
-        .addStringOption(option =>
-            option.setName('tier').setDescription('プラン (Pro/Pro+)').setRequired(true)
-                .addChoices({ name: 'Pro', value: 'Pro' }, { name: 'Pro+', value: 'Pro+' }))
-        .addIntegerOption(option =>
-            option.setName('months').setDescription('有効期間 (ヶ月)').setRequired(true))
-        .addStringOption(option =>
-            option.setName('note').setDescription('メモ'))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
@@ -47,7 +36,7 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['sync', 'activate', 'setup_vc', 'generate_key'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'setup_vc'].includes(interaction.commandName)) {
         try {
             const commandHandler = require(`./subcommands/${interaction.commandName}`);
             await commandHandler(interaction);
