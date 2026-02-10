@@ -14,9 +14,9 @@ router.get('/', authMiddleware, async (req, res) => {
         const client = req.app.discordClient;
         if (client) {
             const enrichedSubs = await Promise.all(subs.map(async sub => {
-                // Determine IDs/Tiers with aggressive fallback
-                const sId = sub.server_id || sub.guild_id || '';
-                const pTier = sub.plan_tier || sub.tier || 'Free';
+                // Determine IDs/Tiers
+                const sId = sub.server_id;
+                const pTier = sub.plan_tier;
 
                 let serverName = 'Unknown Server';
                 let userName = 'Unknown User';
