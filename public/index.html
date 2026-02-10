@@ -322,20 +322,34 @@
                         app.status === 'cancelled' ? '<span class="badge bg-secondary">キャンセル</span>' :
                             '<span class="badge bg-warning">保留中</span>';
 
-                const parsedInfo = `<small>BOOTH: ${app.parsed_booth_name || '?'}<br>Tier: ${app.parsed_tier || '?'}</small>`;
+                const detailHtml = `
+                    <div class="small">
+                        <strong>BOOTH:</strong> <span class="text-info">${app.parsed_booth_name || '不明'}</span><br>
+                        <strong>Tier:</strong> <span class="badge bg-outline-primary border border-primary">${app.parsed_tier || '不明'}</span><br>
+                        <strong>Server ID:</strong> <code>${app.parsed_server_id || '不明'}</code><br>
+                        <strong>User ID:</strong> <code>${app.parsed_user_id || '不明'}</code>
+                    </div>
+                `;
 
                 let actionButtons = '';
                 if (app.status === 'pending') {
-                    actionButtons = `<button class="btn btn-sm btn-success me-1" onclick="approveApp(${app.id})">承認</button><button class="btn btn-sm btn-danger" onclick="rejectApp(${app.id})">拒否</button>`;
+                    actionButtons = `
+                        <button class="btn btn-sm btn-success me-1" onclick="approveApp(${app.id})">承認</button>
+                        <button class="btn btn-sm btn-danger me-1" onclick="rejectApp(${app.id})">拒否</button>
+                    `;
                 } else if (app.status === 'approved' && app.license_key) {
-                    actionButtons = `<button class="btn btn-sm btn-outline-info" onclick="showKeyInfo('${app.license_key}', '${app.parsed_tier}')">キー表示</button>`;
+                    actionButtons = `
+                        <button class="btn btn-sm btn-outline-info me-1" onclick="showKeyInfo('${app.license_key}', '${app.parsed_tier}')">キー表示</button>
+                    `;
                 }
 
+                // Add Delete button to all
+                actionButtons += `<button class="btn btn-sm btn-outline-danger" onclick="deleteApp(${app.id})">削除</button>`;
+
                 tr.innerHTML = `
-                    <td>${new Date(app.created_at).toLocaleString()}</td>
-                    <td>${app.author_name}</td>
-                    <td><small>${app.content}</small></td>
-                    <td>${parsedInfo}</td>
+                    <td><small>${new Date(app.created_at).toLocaleString('ja-JP')}</small></td>
+                    <td>${app.author_name}<br><small class="text-muted">${app.author_id}</small></td>
+                    <td>${detailHtml}</td>
                     <td>${statusBadge}</td>
                     <td>${actionButtons}</td>
                 `;
@@ -344,11 +358,19 @@
         }
 
         async function approveApp(id) {
-            if (!confirm('承認してキーを発行しますか？')) return;
+            if (!confirm('この申請を承認し、ライセンスキーを発行しますか？')) return;
             const res = await apiRequest(`/applications/${id}/approve`, 'POST');
             if (res && res.success) {
                 fetchApps();
                 showKeyInfo(res.key, res.tier);
+            }
+        }
+
+        async function deleteApp(id) {
+            if (!confirm('この申請記録を完全に削除しますか？（発行済みのキーは無効化されません）')) return;
+            const res = await apiRequest(`/applications/${id}`, 'DELETE');
+            if (res && res.success) {
+                fetchApps();
             }
         }
 
