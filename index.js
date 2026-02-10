@@ -1,5 +1,20 @@
 require('dotenv').config(); // Load env vars FIRST
 const { Client, GatewayIntentBits, Events, ActivityType } = require('discord.js');
+
+// Enviroment Variable Check
+const envVars = [
+    'DATABASE_URL',
+    'DISCORD_TOKEN',
+    'CLIENT_ID',
+    'DISCORD_CLIENT_SECRET',
+    'ADMIN_TOKEN',
+    'PUBLIC_URL'
+];
+console.log('>>> Environment Check:');
+envVars.forEach(key => {
+    const val = process.env[key];
+    console.log(`[Env] ${key}: ${val ? (key.includes('TOKEN') || key.includes('SECRET') || key.includes('URL') ? (val.length > 10 ? val.substring(0, 5) + '...' : '***') : val) : 'MISSING'}`);
+});
 const { initDB } = require('./db');
 const { commands, adminCommands, publicCommands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
