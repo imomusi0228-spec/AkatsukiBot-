@@ -105,74 +105,40 @@
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div id="userInfo" class="text-white small"></div>
-                <ul class="nav nav-tabs" id="myTab" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="subs-tab" data-bs-toggle="tab" data-bs-target="#subs"
-                            type="button" role="tab">サブスクリプション</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="apps-tab" data-bs-toggle="tab" data-bs-target="#apps" type="button"
-                            role="tab">申請一覧</button>
-                    </li>
-                </ul>
             </div>
+        </div>
 
-            <div class="tab-content" id="myTabContent">
-                <!-- Subscriptions Tab -->
-                <div class="tab-pane fade show active" id="subs" role="tabpanel">
-                    <!-- existing content -->
-                    <div class="d-flex justify-content-between mb-3">
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">新規追加</button>
-                        <div>
-                            <button class="btn btn-secondary me-2" onclick="syncRoles()">ロール同期</button>
-                            <!-- Search or filter could go here -->
-                        </div>
-                    </div>
-                    <div class="card p-3">
-                        <table class="table table-hover table-dark">
-                            <thead>
-                                <tr>
-                                    <th>サーバー名 / ID</th>
-                                    <th>表示名 / ユーザーID</th>
-                                    <th>Tier</th>
-                                    <th>ステータス</th>
-                                    <th>有効期限</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subsTableBody">
-                                <!-- Rows here -->
-                            </tbody>
-                        </table>
+        <div class="tab-content" id="myTabContent">
+            <!-- Subscriptions Tab -->
+            <div class="tab-pane fade show active" id="subs" role="tabpanel">
+                <!-- existing content -->
+                <div class="d-flex justify-content-between mb-3">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">新規追加</button>
+                    <div>
+                        <button class="btn btn-secondary me-2" onclick="syncRoles()">ロール同期</button>
+                        <!-- Search or filter could go here -->
                     </div>
                 </div>
-
-
-
-                <!-- Apps Tab -->
-                <!-- ... existing apps tab ... -->
-                <div class="tab-pane fade" id="apps" role="tabpanel">
-                    <button class="btn btn-sm btn-outline-secondary mb-2" onclick="fetchApps()">申請更新</button>
-                    <div class="card p-3">
-                        <table class="table table-sm table-dark">
-                            <thead>
-                                <tr>
-                                    <th>日時</th>
-                                    <th>申請者</th>
-                                    <th>内容</th>
-                                    <th>解析結果</th>
-                                    <th>ステータス</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="appsTableBody">
-                                <!-- Rows here -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="card p-3">
+                    <table class="table table-hover table-dark">
+                        <thead>
+                            <tr>
+                                <th>サーバー名 / ID</th>
+                                <th>表示名 / ユーザーID</th>
+                                <th>Tier</th>
+                                <th>ステータス</th>
+                                <th>有効期限</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subsTableBody">
+                            <!-- Rows here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <!-- ... Modals ... -->
@@ -329,7 +295,6 @@
             }
 
             fetchSubscriptions();
-            fetchApps();
         }
 
         async function apiRequest(endpoint, method = 'GET', body = null) {
@@ -476,81 +441,6 @@
                 fetchSubscriptions();
             }
         }
-
-        async function fetchApps() {
-            const data = await apiRequest('/applications');
-            if (!data) return;
-            const tbody = document.getElementById('appsTableBody');
-            tbody.innerHTML = '';
-            data.forEach(app => {
-                const tr = document.createElement('tr');
-                const statusBadge = app.status === 'approved' ? '<span class="badge bg-success">承認済み</span>' :
-                    app.status === 'rejected' ? '<span class="badge bg-danger">拒否</span>' :
-                        app.status === 'cancelled' ? '<span class="badge bg-secondary">キャンセル</span>' :
-                            '<span class="badge bg-warning">保留中</span>';
-
-                const autoBadge = app.auto_processed ? '<span class="badge bg-info ms-1">自動</span>' : '';
-
-                const parsedInfo = `
-                    <small>
-                    BOOTH: ${app.parsed_booth_name || '?'}<br>
-                    SID: ${app.parsed_server_id || '?'}<br>
-                    UID: ${app.parsed_user_id || '?'}<br>
-                    Tier: ${app.parsed_tier || '?'}
-                    </small>
-                `;
-
-                let actionButtons = '';
-                if (app.status === 'pending') {
-                    actionButtons = `
-                        <button class="btn btn-sm btn-success me-1" onclick="approveApp(${app.id})">承認</button>
-                        <button class="btn btn-sm btn-danger" onclick="rejectApp(${app.id})">拒否</button>
-                    `;
-                } else if (app.status === 'approved') {
-                    actionButtons = `
-                        <button class="btn btn-sm btn-warning" onclick="cancelApp(${app.id})">キャンセル</button>
-                    `;
-                }
-
-                tr.innerHTML = `
-                <td>${new Date(app.created_at).toLocaleString()}</td>
-                <td>${app.author_name}<br><small class="text-muted">${app.author_id}</small></td>
-                <td><small style="white-space: pre-wrap;">${app.content}</small></td>
-                <td>${parsedInfo}</td>
-                <td>${statusBadge}${autoBadge}</td>
-                <td>${actionButtons}</td>
-            `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function approveApp(id) {
-            if (!confirm('この申請を承認しますか？')) return;
-            const res = await apiRequest(`/applications/${id}/approve`, 'POST');
-            if (res && res.success) {
-                alert('承認しました！');
-                fetchApps();
-                fetchSubscriptions();
-            }
-        }
-
-        async function rejectApp(id) {
-            if (!confirm('この申請を拒否しますか？')) return;
-            const res = await apiRequest(`/applications/${id}/reject`, 'POST');
-            if (res && res.success) {
-                alert('拒否しました。');
-                fetchApps();
-            }
-        }
-
-        async function cancelApp(id) {
-            if (!confirm('この承認済み申請をキャンセルしますか？サブスクリプションも無効化されます。')) return;
-            const res = await apiRequest(`/applications/${id}/cancel`, 'POST');
-            if (res && res.success) {
-                alert('キャンセルしました。');
-                fetchApps();
-                fetchSubscriptions();
-            }
         }
     </script>
 </body>
