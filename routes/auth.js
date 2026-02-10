@@ -109,6 +109,8 @@ router.get('/callback', async (req, res) => {
     }
     usedCodes.add(code);
 
+    const USER_AGENT = 'DiscordBot (https://github.com/imomusi0228-spec/AkatsukiBot-, 1.0.0)';
+
     try {
         const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
             client_id: DISCORD_CLIENT_ID,
@@ -118,12 +120,18 @@ router.get('/callback', async (req, res) => {
             redirect_uri: REDIRECT_URI,
             scope: 'identify guilds'
         }), {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': USER_AGENT
+            }
         });
 
         const { access_token } = tokenResponse.data;
         const userResponse = await axios.get('https://discord.com/api/users/@me', {
-            headers: { Authorization: `Bearer ${access_token}` }
+            headers: {
+                Authorization: `Bearer ${access_token}`,
+                'User-Agent': USER_AGENT
+            }
         });
 
         const user = userResponse.data;
