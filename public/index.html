@@ -120,7 +120,6 @@
             <div class="tab-content" id="myTabContent">
                 <!-- Subscriptions Tab -->
                 <div class="tab-pane fade show active" id="subs" role="tabpanel">
-                    <!-- existing content -->
                     <div class="d-flex justify-content-between mb-3">
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">新規追加</button>
                         <div>
@@ -145,85 +144,50 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Apps Tab -->
+                <div class="tab-pane fade" id="apps" role="tabpanel">
+                    <button class="btn btn-sm btn-outline-secondary mb-2" onclick="fetchApps()">申請更新</button>
+                    <div class="card p-3">
+                        <table class="table table-sm table-dark">
+                            <thead>
+                                <tr>
+                                    <th>日時</th>
+                                    <th>申請者</th>
+                                    <th>内容</th>
+                                    <th>解析結果</th>
+                                    <th>ステータス</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="appsTableBody">
+                                <!-- Rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ... Modals ... -->
-    <!-- Add Modal -->
-    <div class="modal fade" id="addModal" tabindex="-1">
+    <!-- Key Result Modal -->
+    <div class="modal fade" id="keyModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">サブスクリプション追加</h5>
+                    <h5 class="modal-title">ライセンスキー発行成功</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-2">
-                        <label>サーバーID</label>
-                        <input type="text" class="form-control" id="addServerId">
+                <div class="modal-body text-center">
+                    <p>以下のキーをユーザーに送信してください：</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="resultKey" class="form-control text-center fw-bold fs-4" readonly>
+                        <button class="btn btn-outline-primary" onclick="copyResultKey()">コピー</button>
                     </div>
-                    <div class="mb-2">
-                        <label>ユーザーID</label>
-                        <input type="text" class="form-control" id="addUserId">
-                    </div>
-                    <div class="mb-2">
-                        <label>Tier</label>
-                        <select class="form-select" id="addTier">
-                            <option value="Pro">Pro</option>
-                            <option value="Pro+">Pro+</option>
-                            <option value="Free">Free</option>
-                        </select>
-                    </div>
-                    <div class="mb-2">
-                        <label>期間</label>
-                        <select class="form-select" id="addDuration">
-                            <option value="1m">月額 (1ヶ月)</option>
-                            <option value="1y">年額 (1年)</option>
-                        </select>
-                    </div>
+                    <p class="small text-muted">プラン: <span id="resultTier"></span></p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" onclick="addSubscription()">保存</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Modal -->
-    <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">サブスクリプション編集</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="editServerId">
-
-                    <h6>延長</h6>
-                    <div class="input-group mb-3">
-                        <select class="form-select" id="extendDuration">
-                            <option value="1m">月額 (1ヶ月)</option>
-                            <option value="1y">年額 (1年)</option>
-                        </select>
-                        <button class="btn btn-outline-primary" onclick="extendSub()">延長</button>
-                    </div>
-
-                    <h6>Tier変更</h6>
-                    <div class="input-group mb-3">
-                        <select class="form-select" id="editTier">
-                            <option value="Pro">Pro</option>
-                            <option value="Pro+">Pro+</option>
-                            <option value="Free">Free</option>
-                        </select>
-                        <button class="btn btn-outline-secondary" onclick="updateTier()">更新</button>
-                    </div>
-
-
-                    <hr>
-                    <button class="btn btn-danger w-100 mb-2" onclick="cancelSub()">サブスクリプションキャンセル</button>
-                    <button class="btn btn-outline-danger w-100" onclick="deleteSub()">完全削除</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
                 </div>
             </div>
         </div>
@@ -234,7 +198,6 @@
         const API_URL = '/api';
         let adminToken = localStorage.getItem('admin_token');
 
-        // Check authentication status on load
         checkAuth();
 
         function toggleAdminLogin() {
@@ -243,7 +206,6 @@
         }
 
         async function checkAuth() {
-            // First check cookie session
             try {
                 const res = await fetch('/api/auth/status');
                 const data = await res.json();
@@ -253,9 +215,7 @@
                 }
             } catch (e) { console.error(e); }
 
-            // Fallback to admin token if exists
             if (adminToken) {
-                // Verify by making a request
                 try {
                     const res = await apiRequest('/subscriptions');
                     if (res) {
@@ -265,7 +225,6 @@
                 } catch (e) { }
             }
 
-            // Not authenticated
             document.getElementById('authSection').style.display = 'block';
             document.getElementById('dashboardSection').style.display = 'none';
         }
@@ -280,13 +239,9 @@
         }
 
         async function logout() {
-            // clear token
             localStorage.removeItem('admin_token');
             adminToken = null;
-
-            // clear cookie
             await fetch('/api/auth/logout', { method: 'POST' });
-
             location.reload();
         }
 
@@ -308,22 +263,16 @@
 
         async function apiRequest(endpoint, method = 'GET', body = null) {
             const headers = { 'Content-Type': 'application/json' };
-            if (adminToken) {
-                headers['Authorization'] = adminToken;
-            }
-            // Cookie is sent automatically by browser
-
+            if (adminToken) headers['Authorization'] = adminToken;
             const options = { method, headers };
             if (body) options.body = JSON.stringify(body);
 
             const res = await fetch(API_URL + endpoint, options);
             if (res.status === 401) {
-                // If it was a token auth and failed, token might be invalid
                 if (adminToken) {
                     alert('セッション有効期限切れ、または認証エラーです。');
                     logout();
                 } else {
-                    // Cookie expiry
                     location.reload();
                 }
                 return null;
@@ -362,7 +311,64 @@
             });
         }
 
+        async function fetchApps() {
+            const data = await apiRequest('/applications');
+            if (!data) return;
+            const tbody = document.getElementById('appsTableBody');
+            tbody.innerHTML = '';
+            data.forEach(app => {
+                const tr = document.createElement('tr');
+                const statusBadge = app.status === 'approved' ? '<span class="badge bg-success">承認済み</span>' :
+                    app.status === 'rejected' ? '<span class="badge bg-danger">拒否</span>' :
+                        app.status === 'cancelled' ? '<span class="badge bg-secondary">キャンセル</span>' :
+                            '<span class="badge bg-warning">保留中</span>';
 
+                const parsedInfo = `<small>BOOTH: ${app.parsed_booth_name || '?'}<br>Tier: ${app.parsed_tier || '?'}</small>`;
+
+                let actionButtons = '';
+                if (app.status === 'pending') {
+                    actionButtons = `<button class="btn btn-sm btn-success me-1" onclick="approveApp(${app.id})">承認</button><button class="btn btn-sm btn-danger" onclick="rejectApp(${app.id})">拒否</button>`;
+                } else if (app.status === 'approved' && app.license_key) {
+                    actionButtons = `<button class="btn btn-sm btn-outline-info" onclick="showKeyInfo('${app.license_key}', '${app.parsed_tier}')">キー表示</button>`;
+                }
+
+                tr.innerHTML = `
+                    <td>${new Date(app.created_at).toLocaleString()}</td>
+                    <td>${app.author_name}</td>
+                    <td><small>${app.content}</small></td>
+                    <td>${parsedInfo}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionButtons}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function approveApp(id) {
+            if (!confirm('承認してキーを発行しますか？')) return;
+            const res = await apiRequest(`/applications/${id}/approve`, 'POST');
+            if (res && res.success) {
+                fetchApps();
+                showKeyInfo(res.key, res.tier);
+            }
+        }
+
+        function showKeyInfo(key, tier) {
+            document.getElementById('resultKey').value = key;
+            document.getElementById('resultTier').innerText = tier;
+            new bootstrap.Modal(document.getElementById('keyModal')).show();
+        }
+
+        function copyResultKey() {
+            navigator.clipboard.writeText(document.getElementById('resultKey').value);
+            alert('コピーしました！');
+        }
+
+        async function rejectApp(id) {
+            if (!confirm('拒否しますか？')) return;
+            const res = await apiRequest(`/applications/${id}/reject`, 'POST');
+            if (res && res.success) fetchApps();
+        }
 
         async function addSubscription() {
             const body = {
@@ -375,13 +381,7 @@
             if (res && res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
                 fetchSubscriptions();
-                // Clear inputs
-                document.getElementById('addServerId').value = '';
-                document.getElementById('addUserId').value = '';
-                document.getElementById('addDuration').value = '1m';
-            } else {
-                alert(res.error || '失敗しました');
-            }
+            } else alert(res.error || '失敗しました');
         }
 
         function openEditModal(serverId, tier) {
@@ -394,61 +394,34 @@
             const id = document.getElementById('editServerId').value;
             const duration = document.getElementById('extendDuration').value;
             const res = await apiRequest(`/subscriptions/${id}`, 'PUT', { action: 'extend', duration });
-            if (res && res.success) {
-                alert('延長しました！');
-                fetchSubscriptions();
-            } else {
-                alert('失敗しました');
-            }
+            if (res && res.success) { fetchSubscriptions(); alert('延長しました！'); }
         }
 
         async function updateTier() {
             const id = document.getElementById('editServerId').value;
             const tier = document.getElementById('editTier').value;
             const res = await apiRequest(`/subscriptions/${id}`, 'PUT', { action: 'update_tier', tier });
-            if (res && res.success) {
-                alert('更新しました！');
-                fetchSubscriptions();
-            }
-        }
-
-        async function updateNotes() {
-            const id = document.getElementById('editServerId').value;
-            const notes = document.getElementById('editNotes').value;
-            const res = await apiRequest(`/subscriptions/${id}`, 'PUT', { action: 'update_note', notes });
-            if (res && res.success) {
-                alert('更新しました！');
-                fetchSubscriptions();
-            }
+            if (res && res.success) fetchSubscriptions();
         }
 
         async function cancelSub() {
-            if (!confirm('本当にキャンセルしますか？')) return;
+            if (!confirm('キャンセルしますか？')) return;
             const id = document.getElementById('editServerId').value;
             const res = await apiRequest(`/subscriptions/${id}`, 'DELETE');
-            if (res && res.success) {
-                bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-                fetchSubscriptions();
-            }
+            if (res && res.success) { bootstrap.Modal.getInstance(document.getElementById('editModal')).hide(); fetchSubscriptions(); }
         }
 
         async function deleteSub() {
-            if (!confirm('本当に完全削除しますか？この操作は取り消せません。')) return;
+            if (!confirm('完全削除しますか？')) return;
             const id = document.getElementById('editServerId').value;
             const res = await apiRequest(`/subscriptions/${id}/delete`, 'DELETE');
-            if (res && res.success) {
-                bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-                fetchSubscriptions();
-            }
+            if (res && res.success) { bootstrap.Modal.getInstance(document.getElementById('editModal')).hide(); fetchSubscriptions(); }
         }
 
         async function syncRoles() {
-            if (!confirm('ロール同期を開始しますか？')) return;
+            if (!confirm('同期を開始しますか？')) return;
             const res = await apiRequest('/sync', 'POST');
-            if (res) {
-                alert(`同期完了。更新数: ${res.updated || 0}`);
-                fetchSubscriptions();
-            }
+            if (res) { alert(`同期完了。更新数: ${res.updated || 0}`); fetchSubscriptions(); }
         }
     </script>
 </body>
