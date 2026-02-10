@@ -13,20 +13,28 @@ async function initDB() {
   try {
     // 1. Rename columns if necessary (migration)
     try {
-      await client.query(`
-        DO $$ 
-        BEGIN 
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='guild_id') THEN
-            ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id;
-          END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='tier') THEN
-            ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier;
-          END IF;
-        END $$;
-      `);
-      console.log('[DB] Column rename migration completed.');
-    } catch (err) {
-      console.warn('[DB] Migration error (renaming):', err.message);
+      await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
+      console.log('[DB] Renamed guild_id to server_id');
+    } catch (e) {
+      if (e.code === '42704') { // undefined_object = column not found (already renamed)
+        // valid state
+      } else if (e.code === '42701') { // duplicate_column (target exists)
+        // valid state
+      } else {
+        console.warn('[DB] Migration Check (guild_id->server_id):', e.message);
+      }
+    }
+    try {
+      await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
+      console.log('[DB] Renamed tier to plan_tier');
+    } catch (e) {
+      if (e.code === '42704') {
+        // valid state
+      } else if (e.code === '42701') {
+        // valid state
+      } else {
+        console.warn('[DB] Migration Check (tier->plan_tier):', e.message);
+      }
     }
 
     // subscriptions table

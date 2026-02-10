@@ -14,14 +14,18 @@ router.get('/', authMiddleware, async (req, res) => {
         const client = req.app.discordClient;
         if (client) {
             const enrichedSubs = await Promise.all(subs.map(async sub => {
+                // Determine IDs/Tiers with aggressive fallback
+                const sId = sub.server_id || sub.guild_id || '';
+                const pTier = sub.plan_tier || sub.tier || 'Free';
+
                 let serverName = 'Unknown Server';
                 let userName = 'Unknown User';
                 let userHandle = 'unknown';
 
                 try {
                     // Fetch Guild Name
-                    if (sub.server_id) {
-                        const guild = await client.guilds.fetch(sub.server_id).catch(() => null);
+                    if (sId) {
+                        const guild = await client.guilds.fetch(sId).catch(() => null);
                         if (guild) serverName = guild.name;
                     }
 
@@ -34,14 +38,14 @@ router.get('/', authMiddleware, async (req, res) => {
                         }
                     }
                 } catch (e) {
-                    console.warn(`[Enrichment] Failed for server ${sub.server_id}: ${e.message}`);
+                    console.warn(`[Enrichment] Failed for server ${sId}: ${e.message}`);
                 }
 
                 // Explicitly return all fields plus enriched data
                 return {
-                    server_id: sub.server_id,
+                    server_id: sId,
                     user_id: sub.user_id,
-                    plan_tier: sub.plan_tier,
+                    plan_tier: pTier,
                     expiry_date: sub.expiry_date,
                     is_active: sub.is_active,
                     server_name: serverName,

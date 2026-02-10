@@ -12,7 +12,7 @@ async function checkExpirations(client) {
     try {
         const res = await db.query(`
             SELECT * FROM subscriptions 
-            WHERE plan_tier != 'Free' 
+            WHERE (plan_tier != 'Free' OR plan_tier IS NULL)
             AND is_active = TRUE 
             AND expiry_date IS NOT NULL 
             AND expiry_date < NOW()
@@ -30,7 +30,8 @@ async function checkExpirations(client) {
         }
 
         for (const sub of res.rows) {
-            console.log(`Processing expiry for Server: ${sub.server_id}, User: ${sub.user_id}`);
+            const sId = sub.server_id || sub.guild_id;
+            console.log(`Processing expiry for Server: ${sId}, User: ${sub.user_id}`);
 
             // 1. Remove Roles & Notify
             try {
@@ -41,7 +42,7 @@ async function checkExpirations(client) {
                     // Send DM
                     const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
                     await member.send({
-                        content: `**【重要】AkatsukiBot サブスクリプション期限切れのお知らせ**\n\n平素よりAkatsukiBotをご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sub.server_id}) のプラン有効期限が切れ、**Freeプラン**へ変更されました。\nPro/Pro+機能を引き続きご利用いただくには、再度サブスクリプションの購入をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`
+                        content: `**【重要】AkatsukiBot サブスクリプション期限切れのお知らせ**\n\n平素よりAkatsukiBotをご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sId}) のプラン有効期限が切れ、**Freeプラン**へ変更されました。\nPro/Pro+機能を引き続きご利用いただくには、再度サブスクリプションの購入をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`
                     }).catch(e => console.warn(`Failed to send DM to ${member.user.tag}: ${e.message}`));
                 }
             } catch (err) {
@@ -50,12 +51,22 @@ async function checkExpirations(client) {
 
 
             // 2. Update DB to Free
-            // We clear expiry_date because Free doesn't expire
-            await db.query(`
-                UPDATE subscriptions 
-                SET plan_tier = 'Free', expiry_date = NULL 
-                WHERE server_id = $1
-            `, [sub.server_id]);
+            try {
+                await db.query(`
+                    UPDATE subscriptions 
+                    SET plan_tier = 'Free', expiry_date = NULL 
+                    WHERE server_id = $1 OR guild_id = $1
+                `, [sId]).catch(async () => {
+                    // Absolute fallback if plan_tier doesn't exist
+                    await db.query(`
+                        UPDATE subscriptions 
+                        SET tier = 'Free', expiry_date = NULL 
+                        WHERE guild_id = $1 OR server_id = $1
+                    `, [sId]);
+                });
+            } catch (err) {
+                console.error(`[Expiry] DB update failed for ${sId}:`, err.message);
+            }
 
             // 3. Log
             // Removed reference to subscription_logs which was deleted.

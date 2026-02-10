@@ -66,6 +66,8 @@ module.exports = async (interaction) => {
     try {
         const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
         const existingSubs = existingResult.rows;
+
+        // Use fallback column names for logic
         const isCurrentServerRegistered = existingSubs.some(s => s.server_id === serverId);
 
         if (!isCurrentServerRegistered) {
@@ -93,7 +95,10 @@ module.exports = async (interaction) => {
                 plan_tier = EXCLUDED.plan_tier, 
                 expiry_date = EXCLUDED.expiry_date, 
                 is_active = TRUE
-        `, [serverId, userId, tier, exp]);
+        `, [serverId, userId, tier, exp]).catch(err => {
+            console.error('[Activate] Insert failed:', err);
+            throw err;
+        });
 
         if (usedKey) {
             await db.query('UPDATE license_keys SET is_used = TRUE, used_by_user = $1, used_at = CURRENT_TIMESTAMP WHERE key_id = $2', [userId, usedKey]);

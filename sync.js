@@ -92,16 +92,36 @@ async function syncSubscriptions(client) {
 
         if (tier !== 'Free') {
             try {
-                const res = await db.query('SELECT server_id, plan_tier, is_active FROM subscriptions WHERE user_id = $1', [memberId]);
+                const res = await db.query('SELECT * FROM subscriptions WHERE user_id = $1', [memberId]);
 
                 if (res.rows.length > 0) {
                     for (const row of res.rows) {
                         if (row.plan_tier !== tier || !row.is_active) {
-                            await db.query(
-                                'UPDATE subscriptions SET plan_tier = $1, is_active = TRUE WHERE server_id = $2',
-                                [tier, row.server_id]
-                            );
-                            updatedCount++;
+                            try {
+                                // Identify correct server ID from row
+                                const sId = row.server_id || row.guild_id;
+
+                                // Use a more dynamic approach or just support both for the update
+                                // Since we prioritize plan_tier, we update it and fallback to tier.
+                                // The most robust way is to check the columns first (cached) or just use logic.
+                                await db.query(
+                                    `UPDATE subscriptions SET 
+                                    plan_tier = $1,
+                                    is_active = TRUE 
+                                 WHERE server_id = $2`,
+                                    [tier, sId]
+                                ).catch(async (err) => {
+                                    console.error(`[Sync] Primary update failed for ${sId}, trying fallback:`, err.message);
+                                    // Fallback to 'guild_id' if server_id fails (unlikely after fixSchema)
+                                    await db.query(
+                                        'UPDATE subscriptions SET tier = $1, is_active = TRUE WHERE guild_id = $2',
+                                        [tier, sId]
+                                    ).catch(e => console.error('[Sync] Fallback update failed:', e.message));
+                                });
+                                updatedCount++;
+                            } catch (err) {
+                                console.error(`[Sync] Failed to update row for user ${member.id}:`, err.message);
+                            }
                         }
                     }
                 }
