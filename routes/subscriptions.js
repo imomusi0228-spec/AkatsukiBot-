@@ -81,6 +81,11 @@ router.post('/', authMiddleware, async (req, res) => {
                 else if (unit === 'm') now.setMonth(now.getMonth() + amount);
                 else if (unit === 'y') now.setFullYear(now.getFullYear() + amount);
                 expiryDate = now;
+            } else if (/^\d+$/.test(duration)) {
+                // Fallback for numeric only (treat as months)
+                const now = new Date();
+                now.setMonth(now.getMonth() + parseInt(duration));
+                expiryDate = now;
             }
         }
 
@@ -110,10 +115,19 @@ router.put('/:id', authMiddleware, async (req, res) => {
             let currentExpiry = subData.expiry_date ? new Date(subData.expiry_date) : new Date();
             if (currentExpiry < new Date()) currentExpiry = new Date();
 
-            const match = duration.match(/^(\d+)([dmy])$/);
-            if (!match) return res.status(400).json({ error: 'Invalid duration' });
-            const amount = parseInt(match[1]);
-            const unit = match[2];
+            const match = String(duration).match(/^(\d+)([dmy])$/);
+            let amount, unit;
+
+            if (match) {
+                amount = parseInt(match[1]);
+                unit = match[2];
+            } else if (/^\d+$/.test(duration)) {
+                amount = parseInt(duration);
+                unit = 'm';
+            } else {
+                return res.status(400).json({ error: 'Invalid duration format (expected e.g. 1m, 1d)' });
+            }
+
             if (unit === 'd') currentExpiry.setDate(currentExpiry.getDate() + amount);
             else if (unit === 'm') currentExpiry.setMonth(currentExpiry.getMonth() + amount);
             else if (unit === 'y') currentExpiry.setFullYear(currentExpiry.getFullYear() + amount);

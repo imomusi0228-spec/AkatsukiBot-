@@ -498,7 +498,7 @@
                 server_id: document.getElementById('addServerId').value,
                 user_id: document.getElementById('addUserId').value,
                 tier: document.getElementById('addTier').value,
-                duration: document.getElementById('addDuration').value
+                duration: document.getElementById('addDuration').value + 'm'
             };
             const res = await apiRequest('/subscriptions', 'POST', body);
             if (res && res.success) {
@@ -515,7 +515,8 @@
 
         async function extendSub() {
             const id = document.getElementById('editServerId').value;
-            const duration = document.getElementById('extendDuration').value;
+            const durationInput = document.getElementById('extendDuration').value;
+            const duration = durationInput + 'm';
             const res = await apiRequest(`/subscriptions/${id}`, 'PUT', { action: 'extend', duration });
             if (res && res.success) { fetchSubscriptions(); alert('延長しました！'); }
         }
