@@ -64,11 +64,20 @@ module.exports = async (interaction) => {
 
     // Check existing subscriptions for this user
     try {
-        const existing = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
-        if (existing.rows.length > 0) {
-            const currentSub = existing.rows[0];
-            if (currentSub.server_id !== serverId) {
-                return interaction.editReply({ content: `既に別のサーバー (ID: ${currentSub.server_id}) が登録されています。1ユーザーにつき1サーバーまで登録可能です。` });
+        const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
+        const existingSubs = existingResult.rows;
+        const isCurrentServerRegistered = existingSubs.some(s => s.server_id === serverId);
+
+        if (!isCurrentServerRegistered) {
+            // Check limits for new server registration
+            let maxLimit = 1;
+            const hasProPlus = (tier === 'Pro+') || existingSubs.some(s => s.plan_tier === 'Pro+');
+            if (hasProPlus) maxLimit = 3;
+
+            if (existingSubs.length >= maxLimit) {
+                return interaction.editReply({
+                    content: `❌ **登録制限エラー**\nお使いのプラン (${hasProPlus ? 'Pro+' : 'Pro'}) では最大 ${maxLimit} サーバーまで登録可能です。\n現在の登録数: ${existingSubs.length}`
+                });
             }
         }
 
@@ -83,9 +92,8 @@ module.exports = async (interaction) => {
             SET user_id = EXCLUDED.user_id, 
                 plan_tier = EXCLUDED.plan_tier, 
                 expiry_date = EXCLUDED.expiry_date, 
-                is_active = TRUE,
-                notes = COALESCE(subscriptions.notes, '') || E'\\n[Activate] ' || $5
-        `, [serverId, userId, tier, exp, `Used Key: ${usedKey}`]);
+                is_active = TRUE
+        `, [serverId, userId, tier, exp]);
 
         if (usedKey) {
             await db.query('UPDATE license_keys SET is_used = TRUE, used_by_user = $1, used_at = CURRENT_TIMESTAMP WHERE key_id = $2', [userId, usedKey]);
@@ -102,9 +110,6 @@ module.exports = async (interaction) => {
                 console.error('[Activate] Failed to sync roles immediately:', err);
             }
         }
-
-        await db.query('INSERT INTO subscription_logs (server_id, action, details) VALUES ($1, $2, $3)',
-            [serverId, 'ACTIVATE', `Tier: ${tier}, Exp: ${exp.toLocaleDateString()}, Method: Key (${usedKey})`]);
 
         await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
 
