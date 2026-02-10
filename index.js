@@ -121,7 +121,7 @@ async function main() {
         console.log('[Web] Server started.');
 
         // 3. Initialize Database
-        await initDB();
+        await db.initDB();
         console.log('[DB] Database initialized.');
 
         // 4. Setup Keep-Alive (Render Support)
