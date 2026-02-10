@@ -4,36 +4,36 @@ const { handleSupportVCButton, handleDeleteVCButton } = require('./handlers/butt
 const adminCommands = [
     new SlashCommandBuilder()
         .setName('sync')
-        .setDescription('Manually sync subscriptions with roles')
+        .setDescription('サブスクリプションとロールを手動で同期します')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
         .setName('setup_vc')
-        .setDescription('Setup Support VC creation panel')
+        .setDescription('サポートVC作成パネルを設置します')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
         .setName('generate_key')
-        .setDescription('Generate a one-time license key')
+        .setDescription('ワンタイムライセンスキーを発行します')
         .addStringOption(option =>
-            option.setName('tier').setDescription('Plan tier (Pro/Pro+)').setRequired(true)
+            option.setName('tier').setDescription('プラン (Pro/Pro+)').setRequired(true)
                 .addChoices({ name: 'Pro', value: 'Pro' }, { name: 'Pro+', value: 'Pro+' }))
         .addIntegerOption(option =>
-            option.setName('months').setDescription('Duration in months').setRequired(true))
+            option.setName('months').setDescription('有効期間 (ヶ月)').setRequired(true))
         .addStringOption(option =>
-            option.setName('note').setDescription('Memo for this key'))
+            option.setName('note').setDescription('メモ'))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
 const publicCommands = [
     new SlashCommandBuilder()
         .setName('activate')
-        .setDescription('Activate subscription for a server')
+        .setDescription('サーバーのサブスクリプションを有効化します')
         .addStringOption(option =>
-            option.setName('server_id').setDescription('Server ID (Optional if used in the server)').setRequired(false))
+            option.setName('server_id').setDescription('サーバーID (サーバー内で使用する場合は省略可)').setRequired(false))
         .addStringOption(option =>
-            option.setName('key').setDescription('License Key or Booth Order Number').setRequired(false)),
+            option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false)),
     new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('Check if the bot is alive')
+        .setDescription('Botの生存確認を行います')
 ];
 
 const commands = [...adminCommands, ...publicCommands];
