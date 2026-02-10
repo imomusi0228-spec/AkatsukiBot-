@@ -131,7 +131,7 @@
                             <thead>
                                 <tr>
                                     <th>サーバー名 / ID</th>
-                                    <th>表示名 / ユーザーID</th>
+                                    <th>対象ユーザー</th>
                                     <th>Tier</th>
                                     <th>ステータス</th>
                                     <th>有効期限</th>
@@ -296,8 +296,8 @@
                     <code class="small text-muted">${sub.server_id}</code>
                 </td>
                 <td>
-                    <div class="fw-bold">${sub.user_name || 'Unknown'}</div>
-                    <code class="small text-muted">${sub.user_id}</code>
+                    <div class="fw-bold fs-6">${sub.user_display_name}</div>
+                    <div class="small text-muted">@${sub.user_handle}</div>
                 </td>
                 <td><span class="badge bg-primary">${sub.plan_tier}</span></td>
                 <td class="${statusClass}">${statusText}</td>

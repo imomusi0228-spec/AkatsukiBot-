@@ -22,12 +22,19 @@ router.get('/', authMiddleware, async (req, res) => {
                     if (guild) serverName = guild.name;
 
                     const user = await client.users.fetch(sub.user_id).catch(() => null);
-                    if (user) userName = user.tag;
+                    if (user) {
+                        return {
+                            ...sub,
+                            server_name: serverName,
+                            user_display_name: user.globalName || user.username,
+                            user_handle: user.username
+                        };
+                    }
                 } catch (e) {
                     // console.warn(`Failed to fetch names: ${e.message}`);
                 }
 
-                return { ...sub, server_name: serverName, user_name: userName };
+                return { ...sub, server_name: serverName, user_display_name: 'Unknown', user_handle: 'unknown' };
             }));
             res.json(enrichedSubs);
         } else {
