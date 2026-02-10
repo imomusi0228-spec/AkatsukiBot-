@@ -71,6 +71,14 @@
 
         .app-detail-container {
             transition: all 0.3s ease;
+            font-size: 1.25rem;
+            /* 文字をさらに大きく */
+        }
+
+        .detail-item {
+            font-size: 1.1rem;
+            /* 詳細部分も読みやすく */
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -332,12 +340,12 @@
 
                 const detailHtml = `
                     <div class="app-detail-container pointer-cursor" onclick="toggleDetails(${app.id})">
-                        <div class="fw-bold text-info">${app.parsed_booth_name || '不明'} <span class="small text-muted">▼</span></div>
-                        <div id="extra-details-${app.id}" class="small d-none mt-2 border-start border-info ps-2">
-                            <strong>BOOTH名:</strong> ${app.parsed_booth_name || '不明'}<br>
-                            <strong>Server ID:</strong> <code>${app.parsed_server_id || '不明'}</code><br>
-                            <strong>User ID:</strong> <code>${app.parsed_user_id || '不明'}</code><br>
-                            <strong>Tier:</strong> <span class="badge bg-outline-primary border border-primary">${app.parsed_tier || '不明'}</span>
+                        <div class="fw-bold text-info fs-4">${app.parsed_booth_name || '不明'} <span class="text-muted" style="font-size: 0.7em;">▼ タップで詳細表示</span></div>
+                        <div id="extra-details-${app.id}" class="d-none mt-3 border-start border-4 border-info ps-3 detail-item bg-dark p-3 rounded">
+                            <div class="mb-2"><strong>購入者名（BOOTH）：</strong> ${app.parsed_booth_name || '不明'}</div>
+                            <div class="mb-2"><strong>サーバーID：</strong> <code class="fs-5">${app.parsed_server_id || '不明'}</code></div>
+                            <div class="mb-2"><strong>ユーザーID：</strong> <code class="fs-5">${app.parsed_user_id || '不明'}</code></div>
+                            <div class="mb-2"><strong>希望プラン：</strong> <span class="badge bg-primary fs-6">${app.parsed_tier || '不明'}</span></div>
                         </div>
                     </div>
                 `;
