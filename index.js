@@ -74,20 +74,12 @@ async function main() {
         console.log('[DB] Database initialized.');
 
         // 4. Setup Keep-Alive (Render Support)
-        const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
+        // 4. Setup Public URL Log
+        const PUBLIC_URL = process.env.PUBLIC_URL;
         if (PUBLIC_URL) {
-            console.log(`[Keep-Alive] Configured for: ${PUBLIC_URL}`);
-            const pingUrl = new URL('/health', PUBLIC_URL).toString();
-            const pingSelf = () => {
-                fetch(pingUrl)
-                    .then(res => {
-                        if (res.ok) console.log(`[Keep-Alive] Ping successful: ${res.status}`);
-                        else console.warn(`[Keep-Alive] Ping returned status: ${res.status}`);
-                    })
-                    .catch(e => console.error(`[Keep-Alive] Ping failed: ${e.message}`));
-            };
-            setTimeout(pingSelf, 5000);
-            setInterval(pingSelf, 300000);
+            console.log(`[Config] Public URL configured: ${PUBLIC_URL}`);
+        } else {
+            console.warn('[Config] PUBLIC_URL is not set. OAuth redirects may fail.');
         }
 
         // 5. Login to Discord
