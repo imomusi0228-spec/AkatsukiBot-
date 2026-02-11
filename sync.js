@@ -103,7 +103,11 @@ async function syncSubscriptions(client) {
 
                 if (res.rows.length > 0) {
                     for (const row of res.rows) {
-                        if (row.plan_tier !== tier || !row.is_active) {
+                        const currentTier = row.plan_tier || '';
+                        // Don't downgrade Trial to regular Pro/Pro+ if it matches the intensity
+                        const isMatch = (currentTier === tier) || (currentTier === `Trial ${tier}`);
+
+                        if (!isMatch || !row.is_active) {
                             try {
                                 // Identify correct server ID from row
                                 const sId = row.server_id;

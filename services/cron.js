@@ -89,21 +89,21 @@ function startCron(client) {
 
                     console.log(`[Cron] Auto-renewed subscription for ${sub.server_id}`);
                 } else {
-                    // 1. Deactivate in DB
-                    await db.query('UPDATE subscriptions SET is_active = FALSE WHERE server_id = $1', [sub.server_id]);
+                    // 1. Transition to Free tier in DB
+                    await db.query('UPDATE subscriptions SET plan_tier = $1, is_active = TRUE, expiry_date = NULL, auto_renew = FALSE WHERE server_id = $2', ['Free', sub.server_id]);
 
                     // 2. Log operation
                     await db.query(`
                         INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
                         VALUES ($1, $2, $3, $4, $5)
-                    `, ['SYSTEM', 'AutoExpired', sub.server_id, 'AUTO_EXPIRE', `Plan: ${sub.plan_tier}`]);
+                    `, ['SYSTEM', 'AutoExpired', sub.server_id, 'AUTO_EXPIRE', `Plan: ${sub.plan_tier} -> Free`]);
 
-                    // 3. Remove roles in Support Server if applicable
+                    // 3. Remove roles in Support Server (Sync to Free)
                     if (client && SUPPORT_GUILD_ID) {
                         const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
-                        if (guild) await updateMemberRoles(guild, sub.user_id, sub.plan_tier);
+                        if (guild) await updateMemberRoles(guild, sub.user_id, 'Free');
                     }
-                    console.log(`[Cron] Deactivated expired subscription for ${sub.server_id}`);
+                    console.log(`[Cron] Transitioned expired subscription for ${sub.server_id} to Free tier.`);
                 }
             }
         } catch (err) {
