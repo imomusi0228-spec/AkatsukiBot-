@@ -18,8 +18,17 @@ async function initDB() {
         WHERE table_name = 'subscriptions' AND column_name = 'guild_id'
       `);
       if (res.rows.length > 0) {
-        await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
-        console.log('[DB] Migrated guild_id to server_id');
+        // Check if server_id already exists to avoid conflict
+        const check = await client.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'subscriptions' AND column_name = 'server_id'
+        `);
+        if (check.rows.length === 0) {
+          await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
+          console.log('[DB] Migrated guild_id to server_id');
+        } else {
+          console.log('[DB] Both guild_id and server_id exist. Please verify manual migration.');
+        }
       }
     } catch (e) {
       console.error('[DB] Guild ID Migration Error:', e.message);
@@ -32,8 +41,17 @@ async function initDB() {
         WHERE table_name = 'subscriptions' AND column_name = 'tier'
       `);
       if (res.rows.length > 0) {
-        await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
-        console.log('[DB] Migrated tier to plan_tier');
+        // Check if plan_tier already exists
+        const check = await client.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'subscriptions' AND column_name = 'plan_tier'
+        `);
+        if (check.rows.length === 0) {
+          await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
+          console.log('[DB] Migrated tier to plan_tier');
+        } else {
+          console.log('[DB] Both tier and plan_tier exist. Please verify manual migration.');
+        }
       }
     } catch (e) {
       console.error('[DB] Tier Migration Error:', e.message);
