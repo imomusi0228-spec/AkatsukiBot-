@@ -15,18 +15,19 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // Security Headers
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "cdn.jsdelivr.net", "unpkg.com"], // Allow CDN for Bootstrap/Vue
-            styleSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "fonts.googleapis.com"],
-            fontSrc: ["'self'", "fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "cdn.discordapp.com"], // Allow Discord Avatars
-            connectSrc: ["'self'"]
-        }
-    }
-}));
+// app.use(helmet({
+//     contentSecurityPolicy: {
+//         directives: {
+//             defaultSrc: ["'self'"],
+//             scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "cdn.jsdelivr.net", "unpkg.com"], // Allow CDN for Bootstrap/Vue
+//             styleSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "fonts.googleapis.com"],
+//             fontSrc: ["'self'", "fonts.gstatic.com"],
+//             imgSrc: ["'self'", "data:", "cdn.discordapp.com"], // Allow Discord Avatars
+//             connectSrc: ["'self'"]
+//         }
+//     }
+// }));
+
 
 // Global Rate Limiting
 const limiter = rateLimit({
