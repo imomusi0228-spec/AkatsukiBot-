@@ -51,6 +51,13 @@ createApp({
         const appDetailsModal = reactive({
             data: {}
         });
+        const announceModal = reactive({
+            title: '',
+            content: '',
+            type: 'normal',
+            sending: false
+        });
+
 
         // Computed
         const filteredSubscriptions = computed(() => {
@@ -222,6 +229,34 @@ createApp({
             new bootstrap.Modal(document.getElementById('appDetailsModal')).show();
         };
 
+        const sendAnnouncement = async () => {
+            if (!announceModal.title || !announceModal.content) {
+                alert('タイトルと内容を入力してください');
+                return;
+            }
+            announceModal.sending = true;
+            try {
+                const res = await api('/announce', 'POST', {
+                    title: announceModal.title,
+                    content: announceModal.content,
+                    type: announceModal.type
+                });
+                if (res.success) {
+                    alert('告知を送信しました');
+                    announceModal.title = '';
+                    announceModal.content = '';
+                    activeTab.value = 'dashboard';
+                } else {
+                    alert('エラー: ' + res.error);
+                }
+            } catch (e) {
+                alert('送信に失敗しました');
+            } finally {
+                announceModal.sending = false;
+            }
+        };
+
+
         // Shortcuts
         const handleKeydown = (e) => {
             if (e.ctrlKey && e.key === 'k') {
@@ -295,7 +330,8 @@ createApp({
             formatDate, deactivateSub, toggleAutoRenew, copyText,
             openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
-            loadData, showOverallPie
+            loadData, showOverallPie,
+            announceModal, sendAnnouncement
         };
     }
 }).mount('#app');

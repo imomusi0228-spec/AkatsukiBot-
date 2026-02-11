@@ -17,4 +17,42 @@ router.post('/sync', authMiddleware, async (req, res) => {
     }
 });
 
+// POST /api/announce
+router.post('/announce', authMiddleware, async (req, res) => {
+    const client = req.app.discordClient;
+    if (!client) {
+        return res.status(503).json({ error: 'Discord Client not ready' });
+    }
+
+    const { title, content, type } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: 'Title and content are required' });
+    }
+
+    try {
+        const channelId = process.env.ANNOUNCEMENT_CHANNEL_ID;
+        const channel = await client.channels.fetch(channelId);
+        if (!channel) {
+            return res.status(404).json({ error: 'Announcement channel not found' });
+        }
+
+        const embed = {
+            title: title,
+            description: content,
+            color: type === 'important' ? 0xff0000 : 0x00ff00,
+            timestamp: new Date().toISOString(),
+            footer: {
+                text: 'AkatsukiBot Update System'
+            }
+        };
+
+        await channel.send({ embeds: [embed] });
+        res.json({ success: true, message: 'Announcement posted' });
+    } catch (err) {
+        console.error('[Announce] Failed to post:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 module.exports = router;
