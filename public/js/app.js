@@ -41,6 +41,9 @@ createApp({
             key: '',
             tier: ''
         });
+        const appDetailsModal = reactive({
+            data: {}
+        });
 
         // Computed
         const filteredSubscriptions = computed(() => {
@@ -210,6 +213,11 @@ createApp({
             loadData();
         };
 
+        const openAppDetails = (app) => {
+            appDetailsModal.data = app;
+            new bootstrap.Modal(document.getElementById('appDetailsModal')).show();
+        };
+
         // Shortcuts
         const handleKeydown = (e) => {
             if (e.ctrlKey && e.key === 'k') {
@@ -244,10 +252,10 @@ createApp({
             user, isAdminLogged, loading, activeTab,
             stats, filteredSubscriptions, applications, logs,
             searchQuery, filterStatus,
-            editModal, addModal, keyModal,
+            editModal, addModal, keyModal, appDetailsModal,
             formatDate, extendSub, deactivateSub, copyText,
             openEditModal, saveEdit, updateTier,
-            approveApp, deleteApp, loginWithToken, logout,
+            approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData
         };
     }
