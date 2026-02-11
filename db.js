@@ -48,9 +48,24 @@ async function initDB() {
         start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expiry_date TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE,
-        auto_renew BOOLEAN DEFAULT FALSE
+        auto_renew BOOLEAN DEFAULT FALSE,
+        expiry_warning_sent BOOLEAN DEFAULT FALSE
       );
     `);
+
+    // Ensure expiry_warning_sent column exists (migration for existing table)
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='expiry_warning_sent') THEN
+            ALTER TABLE subscriptions ADD COLUMN expiry_warning_sent BOOLEAN DEFAULT FALSE;
+          END IF;
+        END $$;
+      `);
+    } catch (err) {
+      console.warn('[DB] Migration failed (expiry_warning_sent column might already exist):', err.message);
+    }
 
     // applications table
     await client.query(`

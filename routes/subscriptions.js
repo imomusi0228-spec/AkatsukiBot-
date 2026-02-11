@@ -156,7 +156,7 @@ router.post('/', authMiddleware, async (req, res) => {
         }
 
         await db.query(
-            'INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active) VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (server_id) DO UPDATE SET user_id = EXCLUDED.user_id, plan_tier = EXCLUDED.plan_tier, expiry_date = EXCLUDED.expiry_date, is_active = TRUE',
+            'INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active, expiry_warning_sent) VALUES ($1, $2, $3, $4, TRUE, FALSE) ON CONFLICT (server_id) DO UPDATE SET user_id = EXCLUDED.user_id, plan_tier = EXCLUDED.plan_tier, expiry_date = EXCLUDED.expiry_date, is_active = TRUE, expiry_warning_sent = FALSE',
             [server_id, user_id, tier, expiryDate]
         );
 
@@ -209,7 +209,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             else if (unit === 'm') currentExpiry.setMonth(currentExpiry.getMonth() + amount);
             else if (unit === 'y') currentExpiry.setFullYear(currentExpiry.getFullYear() + amount);
 
-            await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE WHERE server_id = $2', [currentExpiry, id]);
+            await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE, expiry_warning_sent = FALSE WHERE server_id = $2', [currentExpiry, id]);
 
             // Log
             await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'EXTEND', $4)`,
