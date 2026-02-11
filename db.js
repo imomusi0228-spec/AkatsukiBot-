@@ -18,7 +18,6 @@ async function initDB() {
         WHERE table_name = 'subscriptions' AND column_name = 'guild_id'
       `);
       if (res.rows.length > 0) {
-        // Check if server_id already exists to avoid conflict
         const check = await client.query(`
             SELECT column_name FROM information_schema.columns 
             WHERE table_name = 'subscriptions' AND column_name = 'server_id'
@@ -26,8 +25,6 @@ async function initDB() {
         if (check.rows.length === 0) {
           await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
           console.log('[DB] Migrated guild_id to server_id');
-        } else {
-          console.log('[DB] Both guild_id and server_id exist. Please verify manual migration.');
         }
       }
     } catch (e) {
@@ -41,7 +38,6 @@ async function initDB() {
         WHERE table_name = 'subscriptions' AND column_name = 'tier'
       `);
       if (res.rows.length > 0) {
-        // Check if plan_tier already exists
         const check = await client.query(`
             SELECT column_name FROM information_schema.columns 
             WHERE table_name = 'subscriptions' AND column_name = 'plan_tier'
@@ -49,15 +45,13 @@ async function initDB() {
         if (check.rows.length === 0) {
           await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
           console.log('[DB] Migrated tier to plan_tier');
-        } else {
-          console.log('[DB] Both tier and plan_tier exist. Please verify manual migration.');
         }
       }
     } catch (e) {
       console.error('[DB] Tier Migration Error:', e.message);
     }
 
-    // subscriptions table
+    // 3. Ensure tables exist
     await client.query(`
       CREATE TABLE IF NOT EXISTS subscriptions (
         server_id VARCHAR(255) PRIMARY KEY,
@@ -67,25 +61,33 @@ async function initDB() {
         expiry_date TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE,
         auto_renew BOOLEAN DEFAULT FALSE,
-        expiry_warning_sent BOOLEAN DEFAULT FALSE
+        expiry_warning_sent BOOLEAN DEFAULT FALSE,
+        notes TEXT,
+        valid_until TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // Ensure expiry_warning_sent column exists (migration for existing table)
-    try {
-      await client.query(`
-        DO $$ 
-        BEGIN 
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='expiry_warning_sent') THEN
-            ALTER TABLE subscriptions ADD COLUMN expiry_warning_sent BOOLEAN DEFAULT FALSE;
-          END IF;
-        END $$;
-      `);
-    } catch (err) {
-      console.warn('[DB] Migration failed (expiry_warning_sent column might already exist):', err.message);
+    // Ensure all columns exist in subscriptions
+    const subCols = ['expiry_warning_sent', 'notes', 'valid_until', 'updated_at', 'auto_renew', 'start_date'];
+    for (const col of subCols) {
+      try {
+        await client.query(`
+          DO $$ 
+          BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='${col}') THEN
+              ALTER TABLE subscriptions ADD COLUMN ${col} ${col === 'auto_renew' || col === 'expiry_warning_sent' ? 'BOOLEAN DEFAULT FALSE' : (col === 'notes' ? 'TEXT' : 'TIMESTAMP')};
+              IF '${col}' = 'updated_at' OR '${col}' = 'start_date' THEN
+                ALTER TABLE subscriptions ALTER COLUMN ${col} SET DEFAULT CURRENT_TIMESTAMP;
+              END IF;
+            END IF;
+          END $$;
+        `);
+      } catch (err) {
+        console.warn(`[DB] Migration failed for column ${col}:`, err.message);
+      }
     }
 
-    // applications table
     await client.query(`
       CREATE TABLE IF NOT EXISTS applications (
         id SERIAL PRIMARY KEY,
@@ -105,21 +107,6 @@ async function initDB() {
       );
     `);
 
-    // Ensure license_key column exists (migration for existing table)
-    try {
-      await client.query(`
-        DO $$ 
-        BEGIN 
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='applications' AND column_name='license_key') THEN
-            ALTER TABLE applications ADD COLUMN license_key VARCHAR(50);
-          END IF;
-        END $$;
-      `);
-    } catch (err) {
-      console.warn('[DB] Migration failed (license_key column might already exist):', err.message);
-    }
-
-    // user_sessions table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
         session_id VARCHAR(255) PRIMARY KEY,
@@ -132,7 +119,6 @@ async function initDB() {
       );
     `);
 
-    // license_keys table (for BOTH custom keys and validated booth order numbers)
     await client.query(`
       CREATE TABLE IF NOT EXISTS license_keys (
         key_id VARCHAR(50) PRIMARY KEY,
@@ -147,22 +133,6 @@ async function initDB() {
       );
     `);
 
-    // Ensure reserved_user_id column exists
-    try {
-      await client.query(`
-        DO $$ 
-        BEGIN 
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='license_keys' AND column_name='reserved_user_id') THEN
-            ALTER TABLE license_keys ADD COLUMN reserved_user_id VARCHAR(255);
-          END IF;
-        END $$;
-      `);
-    } catch (err) {
-      console.warn('[DB] Migration failed (reserved_user_id):', err.message);
-    }
-
-
-    // operation_logs table
     await client.query(`
       CREATE TABLE IF NOT EXISTS operation_logs (
         id SERIAL PRIMARY KEY,

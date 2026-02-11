@@ -138,10 +138,10 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
         // Growth Data (Last 6 months)
         const growthRes = await db.query(`
             SELECT 
-                TO_CHAR(start_date, 'YYYY-MM') as month,
+                TO_CHAR(COALESCE(start_date, created_at, NOW()), 'YYYY-MM') as month,
                 COUNT(*) as count
             FROM subscriptions 
-            WHERE start_date >= NOW() - INTERVAL '6 months'
+            WHERE COALESCE(start_date, created_at, NOW()) >= NOW() - INTERVAL '6 months'
             GROUP BY month
             ORDER BY month ASC
         `);
