@@ -7,7 +7,12 @@ const crypto = require('crypto');
 // Get all applications
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM applications ORDER BY created_at DESC');
+        const result = await db.query(`
+            SELECT a.*, l.is_used 
+            FROM applications a 
+            LEFT JOIN license_keys l ON a.license_key = l.key_id 
+            ORDER BY a.created_at DESC
+        `);
         const apps = result.rows;
 
         // Fetch names from Discord
