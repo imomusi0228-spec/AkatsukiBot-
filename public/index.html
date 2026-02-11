@@ -436,6 +436,7 @@
                         </tbody>
                     </table>
                 </div>
+
                 <!-- Tab Content: Announcements -->
                 <div v-if="activeTab === 'announce'" class="px-3">
                     <div class="panel p-4" style="max-width: 800px; margin: 0 auto;">
@@ -466,149 +467,153 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
 
-            <!-- Edit Modal -->
-            <div class="modal fade" id="editModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">詳細編集: {{ editModal.data.guild_id }}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+
+                <!-- Edit Modal -->
+                <div class="modal fade" id="editModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">詳細編集: {{ editModal.data.guild_id }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-4">
+                                    <label class="form-label">プラン</label>
+                                    <div class="input-group">
+                                        <select v-model="editModal.data.tier" class="form-select">
+                                            <option value="Free">Free (無料)</option>
+                                            <option value="Trial Pro">Trial Pro (お試しプロ)</option>
+                                            <option value="Trial Pro+">Trial Pro+ (お試しプロプラス)</option>
+                                            <option value="Pro">Pro (プロ)</option>
+                                            <option value="Pro+">Pro+ (プロプラス)</option>
+                                        </select>
+                                        <button class="btn btn-outline-primary" @click="updateTier">変更保存</button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">期間調整 <small class="text-muted">※短縮はマイナス入力</small></label>
+                                    <div class="input-group">
+                                        <input type="number" v-model="editModal.extendDuration" class="form-control">
+                                        <select v-model="editModal.extendUnit" class="form-select"
+                                            style="max-width: 80px;">
+                                            <option value="m">月</option>
+                                            <option value="d">日</option>
+                                        </select>
+                                        <button class="btn btn-success" @click="saveEdit">実行</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="modal-body">
-                            <div class="mb-4">
-                                <label class="form-label">プラン</label>
-                                <div class="input-group">
-                                    <select v-model="editModal.data.tier" class="form-select">
+                    </div>
+                </div>
+
+                <!-- Key Modal -->
+                <div class="modal fade" id="keyModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">License Key Issued</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <p class="display-6 user-select-all">{{ keyModal.key }}</p>
+                                <p class="text-muted">{{ keyModal.tier }} License</p>
+                                <button class="btn btn-primary" @click="copyText(keyModal.key)">Copy</button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- App Details Modal -->
+                <div class="modal fade" id="appDetailsModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">申請詳細</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small">Discord User</label>
+                                    <div>{{ appDetailsModal.data.author_name }} <span class="text-muted">({{
+                                            appDetailsModal.data.author_id }})</span></div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small">申請内容 (全文)</label>
+                                    <div class="p-3 bg-dark rounded border border-secondary"
+                                        style="white-space: pre-wrap;">
+                                        {{
+                                        appDetailsModal.data.content }}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-muted small">解析: ユーザーID</label>
+                                    <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_user_id || 'N/A'
+                                        }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-muted small">解析: サーバーID</label>
+                                    <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_guild_id || 'N/A'
+                                        }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Modal -->
+                <div class="modal fade" id="addModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">ライセンス新規作成</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">サーバーID</label>
+                                    <input type="text" v-model="addModal.data.guild_id" class="form-control"
+                                        placeholder="Discord Guild ID">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">ユーザーID</label>
+                                    <input type="text" v-model="addModal.data.user_id" class="form-control"
+                                        placeholder="Discord User ID">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">プラン</label>
+                                    <select v-model="addModal.data.tier" class="form-select">
                                         <option value="Free">Free (無料)</option>
                                         <option value="Trial Pro">Trial Pro (お試しプロ)</option>
                                         <option value="Trial Pro+">Trial Pro+ (お試しプロプラス)</option>
                                         <option value="Pro">Pro (プロ)</option>
                                         <option value="Pro+">Pro+ (プロプラス)</option>
                                     </select>
-                                    <button class="btn btn-outline-primary" @click="updateTier">変更保存</button>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">期間 (例: 1m, 1y, 30d)</label>
+                                    <input type="text" v-model="addModal.data.duration" class="form-control">
                                 </div>
                             </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">期間調整 <small class="text-muted">※短縮はマイナス入力</small></label>
-                                <div class="input-group">
-                                    <input type="number" v-model="editModal.extendDuration" class="form-control">
-                                    <select v-model="editModal.extendUnit" class="form-select" style="max-width: 80px;">
-                                        <option value="m">月</option>
-                                        <option value="d">日</option>
-                                    </select>
-                                    <button class="btn btn-success" @click="saveEdit">実行</button>
-                                </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary w-100" @click="createSub">作成実行</button>
                             </div>
                         </div>
                     </div>
                 </div>
+
             </div>
 
-            <!-- Key Modal -->
-            <div class="modal fade" id="keyModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">License Key Issued</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body text-center">
-                            <p class="display-6 user-select-all">{{ keyModal.key }}</p>
-                            <p class="text-muted">{{ keyModal.tier }} License</p>
-                            <button class="btn btn-primary" @click="copyText(keyModal.key)">Copy</button>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-
-            <!-- App Details Modal -->
-            <div class="modal fade" id="appDetailsModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">申請詳細</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label text-muted small">Discord User</label>
-                                <div>{{ appDetailsModal.data.author_name }} <span class="text-muted">({{
-                                        appDetailsModal.data.author_id }})</span></div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small">申請内容 (全文)</label>
-                                <div class="p-3 bg-dark rounded border border-secondary" style="white-space: pre-wrap;">
-                                    {{
-                                    appDetailsModal.data.content }}</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted small">解析: ユーザーID</label>
-                                <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_user_id || 'N/A' }}
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted small">解析: サーバーID</label>
-                                <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_guild_id || 'N/A' }}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Add Modal -->
-            <div class="modal fade" id="addModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">ライセンス新規作成</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label">サーバーID</label>
-                                <input type="text" v-model="addModal.data.guild_id" class="form-control"
-                                    placeholder="Discord Guild ID">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">ユーザーID</label>
-                                <input type="text" v-model="addModal.data.user_id" class="form-control"
-                                    placeholder="Discord User ID">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">プラン</label>
-                                <select v-model="addModal.data.tier" class="form-select">
-                                    <option value="Free">Free (無料)</option>
-                                    <option value="Trial Pro">Trial Pro (お試しプロ)</option>
-                                    <option value="Trial Pro+">Trial Pro+ (お試しプロプラス)</option>
-                                    <option value="Pro">Pro (プロ)</option>
-                                    <option value="Pro+">Pro+ (プロプラス)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">期間 (例: 1m, 1y, 30d)</label>
-                                <input type="text" v-model="addModal.data.duration" class="form-control">
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary w-100" @click="createSub">作成実行</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script src="js/app.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            <script src="js/app.js"></script>
 </body>
 
 </html>
