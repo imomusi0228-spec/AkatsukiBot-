@@ -20,7 +20,12 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     color: #fff;
     font-weight: 600;
 }
@@ -81,6 +86,20 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--accent);
 }
 
+/* Tier Badges */
+.badge-tier-pro {
+    background-color: rgba(122, 162, 247, 0.2);
+    color: #7aa2f7;
+    border: 1px solid rgba(122, 162, 247, 0.5);
+}
+
+.badge-tier-pro-plus {
+    background-color: rgba(224, 175, 104, 0.2);
+    color: #e0af68;
+    border: 1px solid rgba(224, 175, 104, 0.5);
+    box-shadow: 0 0 10px rgba(224, 175, 104, 0.2);
+}
+
 /* Stats Cards */
 .stat-card {
     display: flex;
@@ -104,10 +123,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Animations */
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
     transition: opacity 0.3s ease;
 }
-.fade-enter-from, .fade-leave-to {
+
+.fade-enter-from,
+.fade-leave-to {
     opacity: 0;
 }
 
@@ -116,25 +138,30 @@ h1, h2, h3, h4, h5, h6 {
     width: 8px;
     height: 8px;
 }
+
 ::-webkit-scrollbar-track {
     background: var(--bg-dark);
 }
+
 ::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
 
 /* Inputs */
-.form-control, .form-select {
+.form-control,
+.form-select {
     background-color: #16161e;
     border-color: var(--border);
     color: var(--text-main);
 }
 
-.form-control:focus, .form-select:focus {
+.form-control:focus,
+.form-select:focus {
     background-color: #16161e;
     border-color: var(--primary);
     color: #fff;
@@ -146,8 +173,12 @@ h1, h2, h3, h4, h5, h6 {
     background-color: var(--bg-panel);
     border: 1px solid var(--border);
 }
-.modal-header, .modal-footer {
+
+.modal-header,
+.modal-footer {
     border-color: var(--border);
 }
 
-[v-cloak] { display: none; }
+[v-cloak] {
+    display: none;
+}
