@@ -100,10 +100,16 @@ h6 {
     box-shadow: 0 0 10px rgba(224, 175, 104, 0.2);
 }
 
-.badge-tier-trial {
-    background-color: rgba(122, 162, 247, 0.2);
+.badge-tier-trial-pro {
+    background-color: rgba(122, 162, 247, 0.1);
     color: #7aa2f7;
-    border: 1px solid rgba(122, 162, 247, 0.5);
+    border: 1px dashed rgba(122, 162, 247, 0.8);
+}
+
+.badge-tier-trial-pro-plus {
+    background-color: rgba(224, 175, 104, 0.1);
+    color: #e0af68;
+    border: 1px dashed rgba(224, 175, 104, 0.8);
 }
 
 /* Stats Cards */

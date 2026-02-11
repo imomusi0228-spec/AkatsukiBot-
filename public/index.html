@@ -161,10 +161,11 @@
                                 </td>
                                 <td>
                                     <span class="badge" :class="{
-                                    'badge-tier-trial': sub.plan_tier === 'Trial',
+                                    'badge-tier-trial-pro': sub.plan_tier === 'Trial Pro',
+                                    'badge-tier-trial-pro-plus': sub.plan_tier === 'Trial Pro+',
                                     'badge-tier-pro': sub.plan_tier === 'Pro',
                                     'badge-tier-pro-plus': sub.plan_tier === 'Pro+',
-                                    'bg-secondary': sub.plan_tier !== 'Pro' && sub.plan_tier !== 'Pro+' && sub.plan_tier !== 'Trial'
+                                    'bg-secondary': sub.plan_tier !== 'Pro' && sub.plan_tier !== 'Pro+' && sub.plan_tier !== 'Trial Pro' && sub.plan_tier !== 'Trial Pro+'
                                 }">{{ sub.plan_tier }}</span>
                                 </td>
                                 <td class="text-center">
@@ -235,10 +236,11 @@
                                         {{ app.parsed_booth_name || '（名称不明 - クリックで全文表示）' }}
                                     </div>
                                     <span class="badge border" :class="{
-                                    'badge-tier-trial': app.parsed_tier === 'Trial',
+                                    'badge-tier-trial-pro': app.parsed_tier === 'Trial Pro',
+                                    'badge-tier-trial-pro-plus': app.parsed_tier === 'Trial Pro+',
                                     'badge-tier-pro': app.parsed_tier === 'Pro',
                                     'badge-tier-pro-plus': app.parsed_tier === 'Pro+',
-                                    'bg-dark': app.parsed_tier !== 'Pro' && app.parsed_tier !== 'Pro+' && app.parsed_tier !== 'Trial'
+                                    'bg-dark': app.parsed_tier !== 'Pro' && app.parsed_tier !== 'Pro+' && app.parsed_tier !== 'Trial Pro' && app.parsed_tier !== 'Trial Pro+'
                                 }">{{ app.parsed_tier }}</span>
                                 </td>
                                 <td>
@@ -311,7 +313,7 @@
                                 <div class="flex-grow-1 mx-3"
                                     style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px;">
                                     <div
-                                        :style="{ width: (count / stats.active_count * 100) + '%', background: tier === 'Pro+' ? 'var(--warning)' : (tier === 'Trial' ? 'var(--info)' : 'var(--primary)'), height: '100%', borderRadius: '4px' }">
+                                        :style="{ width: (count / stats.active_count * 100) + '%', background: (tier === 'Pro+' || tier === 'Trial Pro+') ? 'var(--warning)' : ((tier === 'Pro' || tier === 'Trial Pro') ? 'var(--primary)' : 'var(--text-muted)'), height: '100%', borderRadius: '4px' }">
                                     </div>
                                 </div>
                                 <span class="fw-bold text-end" style="min-width: 25px;">{{ count }}</span>
@@ -381,7 +383,8 @@
                             <div class="input-group">
                                 <select v-model="editModal.data.plan_tier" class="form-select">
                                     <option value="Free">Free (無料)</option>
-                                    <option value="Trial">Trial (お試し)</option>
+                                    <option value="Trial Pro">Trial Pro (お試しプロ)</option>
+                                    <option value="Trial Pro+">Trial Pro+ (お試しプロプラス)</option>
                                     <option value="Pro">Pro (プロ)</option>
                                     <option value="Pro+">Pro+ (プロプラス)</option>
                                 </select>
@@ -485,7 +488,8 @@
                             <label class="form-label">プラン</label>
                             <select v-model="addModal.data.tier" class="form-select">
                                 <option value="Free">Free (無料)</option>
-                                <option value="Trial">Trial (お試し)</option>
+                                <option value="Trial Pro">Trial Pro (お試しプロ)</option>
+                                <option value="Trial Pro+">Trial Pro+ (お試しプロプラス)</option>
                                 <option value="Pro">Pro (プロ)</option>
                                 <option value="Pro+">Pro+ (プロプラス)</option>
                             </select>

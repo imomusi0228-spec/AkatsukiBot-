@@ -30,10 +30,10 @@ async function updateMemberRoles(guild, userId, tier) {
         ].filter(id => id); // Remove empty/null strings
 
         let rolesToAdd = [];
-        if (tier === 'Pro+') {
+        if (tier === 'Pro+' || tier === 'Trial Pro+') {
             // Favor Yearly if both might exist, but usually just one
             rolesToAdd = [ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']].filter(id => id);
-        } else if (tier === 'Pro') {
+        } else if (tier === 'Pro' || tier === 'Trial Pro') {
             rolesToAdd = [ROLES['ProMonthly'], ROLES['ProYearly']].filter(id => id);
         }
 
