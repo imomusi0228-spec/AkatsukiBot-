@@ -64,12 +64,13 @@ async function initDB() {
         expiry_warning_sent BOOLEAN DEFAULT FALSE,
         notes TEXT,
         valid_until TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     // Ensure all columns exist in subscriptions
-    const subCols = ['expiry_warning_sent', 'notes', 'valid_until', 'updated_at', 'auto_renew', 'start_date'];
+    const subCols = ['expiry_warning_sent', 'notes', 'valid_until', 'updated_at', 'auto_renew', 'start_date', 'created_at'];
     for (const col of subCols) {
       try {
         await client.query(`
