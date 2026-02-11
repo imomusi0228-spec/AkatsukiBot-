@@ -36,9 +36,14 @@ function startCron(client) {
                             const member = await guild.members.fetch(sub.user_id).catch(() => null);
                             if (member) {
                                 const expiryDate = new Date(sub.expiry_date).toLocaleDateString('ja-JP');
-                                await member.send({
-                                    content: `**【お知らせ】☾ サブスクリプション失効予告**\n\n平素より☾をご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sub.server_id}) の**${sub.plan_tier}プラン**が、**${expiryDate}**に失効予定です。\n\nプランが失効すると、自動的に**Freeプラン**へ変更され、Pro/Pro+機能がご利用いただけなくなります。\n継続してご利用いただくには、期限前にサブスクリプションの更新をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`
-                                }).catch(e => console.warn(`[Cron] Failed to send warning DM to ${member.user.tag}: ${e.message}`));
+
+                                let messageContent = `**【お知らせ】☾ サブスクリプション失効予告**\n\n平素より☾をご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sub.server_id}) の**${sub.plan_tier}プラン**が、**${expiryDate}**に失効予定です。\n\nプランが失効すると、自動的に**Freeプラン**へ変更され、Pro/Pro+機能がご利用いただけなくなります。\n継続してご利用いただくには、期限前にサブスクリプションの更新をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`;
+
+                                if (sub.plan_tier.includes('Trial')) {
+                                    messageContent = `**【お知らせ】☾ お試し期間終了間近**\n\nお嬢様／旦那様、☾ のフル機能を気に入っていただけましたか？\n\n現在ご利用中の**${sub.plan_tier}（お試し版）**は、**${expiryDate}**に期限を迎えます。\n期限が切れると一部の高度な機能が制限されますが、ご安心ください。本契約をいただければ、引き続きすべての機能をお楽しみいただけますよ。\n\nぜひ、この機会に本契約をご検討ください！ボクがお待ちしています。\n\n🛒 **本契約はこちらから:**\n${boothUrl}`;
+                                }
+
+                                await member.send({ content: messageContent }).catch(e => console.warn(`[Cron] Failed to send warning DM to ${member.user.tag}: ${e.message}`));
 
                                 // Mark as sent
                                 await db.query('UPDATE subscriptions SET expiry_warning_sent = TRUE WHERE server_id = $1', [sub.server_id]);
@@ -47,9 +52,9 @@ function startCron(client) {
                                 await db.query(`
                                     INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
                                     VALUES ($1, $2, $3, $4, $5)
-                                `, ['SYSTEM', 'AutoWarning', sub.server_id, 'EXPIRY_WARNING', `Plan: ${sub.plan_tier}, Expiry: ${expiryDate}`]);
+                                `, ['SYSTEM', 'AutoWarning', sub.server_id, 'EXPIRY_WARNING', `Plan: ${sub.plan_tier}, Expiry: ${expiryDate}${sub.plan_tier.includes('Trial') ? ' (Trial Solicit)' : ''}`]);
 
-                                console.log(`[Cron] Sent expiry warning to user ${sub.user_id} for server ${sub.server_id}`);
+                                console.log(`[Cron] Sent ${sub.plan_tier.includes('Trial') ? 'trial solicit' : 'expiry warning'} to user ${sub.user_id} for server ${sub.server_id}`);
                             }
                         }
                     }
