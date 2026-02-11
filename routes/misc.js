@@ -31,6 +31,10 @@ router.post('/announce', authMiddleware, async (req, res) => {
 
     try {
         const channelId = process.env.ANNOUNCEMENT_CHANNEL_ID;
+        if (!channelId) {
+            console.error('[Announce] ANNOUNCEMENT_CHANNEL_ID is not set.');
+            return res.status(500).json({ error: 'Announcement channel ID not configured' });
+        }
         const channel = await client.channels.fetch(channelId);
         if (!channel) {
             return res.status(404).json({ error: 'Announcement channel not found' });

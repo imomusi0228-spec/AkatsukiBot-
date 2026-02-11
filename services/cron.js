@@ -26,7 +26,7 @@ function startCron(client) {
             };
 
             // 1. Check for subscriptions expiring within 7 days (warning notification)
-            const res = await db.query("SELECT guild_id, user_id, tier, expiry_date, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW() + INTERVAL '7 days' AND expiry_warning_sent = FALSE AND tier NOT IN ('Free', '0', 0)");
+            const res = await db.query("SELECT guild_id, user_id, tier, expiry_date, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW() + INTERVAL '7 days' AND expiry_warning_sent = FALSE AND tier NOT IN ('Free', '0')");
 
             for (const sub of res.rows) {
                 const guildId = sub.guild_id;
