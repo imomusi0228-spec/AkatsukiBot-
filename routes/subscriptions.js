@@ -35,6 +35,7 @@ router.get('/', authMiddleware, async (req, res) => {
                         if (user) {
                             userName = user.globalName || user.username;
                             userHandle = user.username;
+                            userAvatar = user.avatar; // Added avatar hash
                         }
                     }
                 } catch (e) {
@@ -48,9 +49,11 @@ router.get('/', authMiddleware, async (req, res) => {
                     plan_tier: pTier,
                     expiry_date: sub.expiry_date,
                     is_active: sub.is_active,
+                    auto_renew: sub.auto_renew, // Added auto_renew
                     server_name: serverName,
                     user_display_name: userName,
-                    user_handle: userHandle
+                    user_handle: userHandle,
+                    user_avatar: userAvatar // Added user_avatar
                 };
             }));
             res.json(enrichedSubs);
@@ -105,6 +108,65 @@ router.get('/stats', authMiddleware, async (req, res) => {
         stats.renewed_this_month = parseInt(renewedRes.rows[0].count);
 
         res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/subscriptions/stats/detailed
+router.get('/stats/detailed', authMiddleware, async (req, res) => {
+    try {
+        const stats = {
+            tier_distribution: {},
+            retention_rate: 0,
+            growth_data: []
+        };
+
+        // Tier Distribution
+        const tierRes = await db.query('SELECT plan_tier, COUNT(*) FROM subscriptions WHERE is_active = TRUE GROUP BY plan_tier');
+        tierRes.rows.forEach(row => {
+            stats.tier_distribution[row.plan_tier] = parseInt(row.count);
+        });
+
+        // Retention Rate (Simplified: Active / Total ever)
+        const totalRes = await db.query('SELECT COUNT(*) FROM subscriptions');
+        const activeRes = await db.query('SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE');
+        const total = parseInt(totalRes.rows[0].count);
+        const active = parseInt(activeRes.rows[0].count);
+        stats.retention_rate = total > 0 ? Math.round((active / total) * 100) : 0;
+
+        // Growth Data (Last 6 months)
+        const growthRes = await db.query(`
+            SELECT 
+                TO_CHAR(start_date, 'YYYY-MM') as month,
+                COUNT(*) as count
+            FROM subscriptions 
+            WHERE start_date >= NOW() - INTERVAL '6 months'
+            GROUP BY month
+            ORDER BY month ASC
+        `);
+        stats.growth_data = growthRes.rows;
+
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PATCH /api/subscriptions/:id/auto-renew
+router.patch('/:id/auto-renew', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { enabled } = req.body;
+    try {
+        await db.query('UPDATE subscriptions SET auto_renew = $1 WHERE server_id = $2', [enabled, id]);
+        
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'TOGGLE_AUTO_RENEW', $4)`,
+            [operatorId, operatorName, id, `Set auto_renew to ${enabled}`]);
+
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

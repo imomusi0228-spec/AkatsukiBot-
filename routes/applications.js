@@ -8,7 +8,38 @@ const crypto = require('crypto');
 router.get('/', authMiddleware, async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM applications ORDER BY created_at DESC');
-        res.json(result.rows);
+        const apps = result.rows;
+
+        // Fetch names from Discord
+        const client = req.app.discordClient;
+        if (client) {
+            const enrichedApps = await Promise.all(apps.map(async app => {
+                let userName = app.author_name || 'Unknown';
+                let userHandle = 'unknown';
+                let userAvatar = null;
+
+                try {
+                    const user = await client.users.fetch(app.author_id).catch(() => null);
+                    if (user) {
+                        userName = user.globalName || user.username;
+                        userHandle = user.username;
+                        userAvatar = user.avatar;
+                    }
+                } catch (e) {
+                    console.warn(`[App Enrichment] Failed for user ${app.author_id}: ${e.message}`);
+                }
+
+                return {
+                    ...app,
+                    user_display_name: userName,
+                    user_handle: userHandle,
+                    user_avatar: userAvatar
+                };
+            }));
+            res.json(enrichedApps);
+        } else {
+            res.json(apps);
+        }
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });

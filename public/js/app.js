@@ -17,6 +17,11 @@ createApp({
         const subscriptions = ref([]);
         const applications = ref([]);
         const logs = ref([]);
+        const detailedStats = ref({
+            tier_distribution: {},
+            retention_rate: 0,
+            growth_data: []
+        });
 
         // Filters & Search
         const searchQuery = ref('');
@@ -28,7 +33,8 @@ createApp({
             data: {
                 server_id: '',
                 plan_tier: 'Pro',
-                expiry_date: null
+                expiry_date: null,
+                auto_renew: false
             },
             extendDuration: 1
         });
@@ -75,14 +81,7 @@ createApp({
                 );
             }
 
-            // Status Sort (Active First, then Expiry Date Asc)
-            return result.sort((a, b) => {
-                // if (a.is_active !== b.is_active) return b.is_active - a.is_active;
-                // return new Date(a.expiry_date || 0) - new Date(b.expiry_date || 0);
-                // Keep default sort from API (expiry ASC) but maybe handle it here?
-                // Let's just use API sort primarily.
-                return 0;
-            });
+            return result;
         });
 
         // Methods
@@ -123,16 +122,18 @@ createApp({
 
         const loadData = async () => {
             loading.value = true;
-            const [sData, aData, stData, lData] = await Promise.all([
+            const [sData, aData, stData, lData, dsData] = await Promise.all([
                 api('/subscriptions'),
                 api('/applications'),
                 api('/subscriptions/stats'),
-                api('/subscriptions/logs')
+                api('/subscriptions/logs'),
+                api('/subscriptions/stats/detailed')
             ]);
             subscriptions.value = sData || [];
             applications.value = aData || [];
             stats.value = stData || {};
             logs.value = lData || [];
+            detailedStats.value = dsData || { tier_distribution: {}, retention_rate: 0, growth_data: [] };
             loading.value = false;
         };
 
@@ -154,17 +155,15 @@ createApp({
             loadData();
         };
 
-        const copyText = (text) => {
-            navigator.clipboard.writeText(text);
-            // toast?
+        const toggleAutoRenew = async (sub) => {
+            const newState = !sub.auto_renew;
+            await api(`/subscriptions/${sub.server_id}/auto-renew`, 'PATCH', { enabled: newState });
+            sub.auto_renew = newState;
         };
 
-        // Modal Logic need to be connected to bootstap modal or custom
-        // Since we are using Vue, let's just use simple v-if modals or integrate bootstrap js
-        // For simplicity, let's use Bootstrap JS via direct DOM manipulation or wrapper
-        // Actually, let's use global functions linked to window for simplicity with existing bootstrap if needed,
-        // BUT we are rewriting. Let's make simple Vue custom modals to be dependency free from jQuery/BootstrapJS if possible,
-        // but since we include Bootstrap CSS, we might as well use its JS.
+        const copyText = (text) => {
+            navigator.clipboard.writeText(text);
+        };
 
         const openEditModal = (sub) => {
             editModal.data = { ...sub };
@@ -178,11 +177,6 @@ createApp({
                 action: 'extend',
                 duration: editModal.extendDuration + 'm'
             });
-            // Also update tier if changed? Split actions for simplicity
-            // The implementation plan said: update tier too.
-            const currentTier = editModal.data.plan_tier;
-            // We can do another call if tier changed.
-            // Ideally API supports both, but currently separated.
             bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
             loadData();
         };
@@ -250,13 +244,14 @@ createApp({
 
         return {
             user, isAdminLogged, loading, activeTab,
-            stats, filteredSubscriptions, applications, logs,
+            stats, detailedStats, filteredSubscriptions, applications, logs,
             searchQuery, filterStatus,
             editModal, addModal, keyModal, appDetailsModal,
-            formatDate, extendSub, deactivateSub, copyText,
+            formatDate, extendSub, deactivateSub, toggleAutoRenew, copyText,
             openEditModal, saveEdit, updateTier,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData
         };
     }
 }).mount('#app');
+
