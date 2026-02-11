@@ -69,7 +69,7 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
 
         // 2. Insert into license_keys
         await db.query(`
-            INSERT INTO license_keys (key_id, plan_tier, duration_months, reserved_user_id, notes)
+            INSERT INTO license_keys (key_id, tier, duration_months, reserved_user_id, notes)
             VALUES ($1, $2, $3, $4, $5)
         `, [key, tier, duration, reservedUser, `Generated for App ID: ${id} (${app.parsed_booth_name})`]);
 

@@ -13,12 +13,12 @@ module.exports = async (interaction) => {
     // 1. Defer the reply immediately to prevent "Unknown interaction" timeout errors (3s limit)
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const inputServerId = interaction.options.getString('server_id');
+    const inputServerId = interaction.options.getString('guild_id');
     const inputKey = interaction.options.getString('key');
-    const serverId = inputServerId ? inputServerId.trim() : interaction.guildId;
+    const guildId = inputServerId ? inputServerId.trim() : interaction.guildId;
     const userId = interaction.user.id;
 
-    if (!serverId) {
+    if (!guildId) {
         return interaction.editReply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。' });
     }
 
@@ -26,7 +26,7 @@ module.exports = async (interaction) => {
         return interaction.editReply({ content: '❌ **ライセンスキーを入力してください。**\nBOOTHで送られたキーが必要です。' });
     }
 
-    if (!/^\d{17,20}$/.test(serverId)) {
+    if (!/^\d{17,20}$/.test(guildId)) {
         return interaction.editReply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。' });
     }
 
@@ -55,9 +55,9 @@ module.exports = async (interaction) => {
                 }
 
                 // Normalize tier casing
-                if (row.plan_tier.toLowerCase() === 'pro') tier = 'Pro';
-                else if (row.plan_tier.toLowerCase() === 'pro+') tier = 'Pro+';
-                else tier = row.plan_tier; // Fallback
+                if (row.tier && row.tier.toLowerCase() === 'pro') tier = 'Pro';
+                else if (row.tier && row.tier.toLowerCase() === 'pro+') tier = 'Pro+';
+                else tier = row.tier; // Fallback
 
                 durationMonths = row.duration_months;
                 usedKey = row.key_id;
@@ -81,13 +81,13 @@ module.exports = async (interaction) => {
         const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
         const existingSubs = existingResult.rows;
 
-        // Use fallback column names for logic
-        const isCurrentServerRegistered = existingSubs.some(s => s.server_id === serverId);
+        const isCurrentServerRegistered = existingSubs.some(s => s.guild_id === guildId);
 
         if (!isCurrentServerRegistered) {
             // Check limits for new server registration
             let maxLimit = 1;
-            const hasProPlus = (tier === 'Pro+') || existingSubs.some(s => s.plan_tier === 'Pro+');
+            const hasProPlus = (tier === 'Pro+') || (tier === '3') || (tier === 3) ||
+                existingSubs.some(s => (s.tier === 'Pro+') || (s.tier === '3') || (s.tier === 3));
             if (hasProPlus) maxLimit = 3;
 
             if (existingSubs.length >= maxLimit) {
@@ -102,14 +102,14 @@ module.exports = async (interaction) => {
         exp.setMonth(exp.getMonth() + durationMonths);
 
         await db.query(`
-            INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active)
+            INSERT INTO subscriptions (guild_id, user_id, tier, expiry_date, is_active)
             VALUES ($1, $2, $3, $4, TRUE)
-            ON CONFLICT (server_id) DO UPDATE 
+            ON CONFLICT (guild_id) DO UPDATE 
             SET user_id = EXCLUDED.user_id, 
-                plan_tier = EXCLUDED.plan_tier, 
+                tier = EXCLUDED.tier, 
                 expiry_date = EXCLUDED.expiry_date, 
                 is_active = TRUE
-        `, [serverId, userId, tier, exp]).catch(err => {
+        `, [guildId, userId, tier, exp]).catch(err => {
             console.error('[Activate] Insert failed:', err);
             throw err;
         });
@@ -130,7 +130,7 @@ module.exports = async (interaction) => {
             }
         }
 
-        await interaction.editReply({ content: `✅ サーバー (ID: ${serverId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
+        await interaction.editReply({ content: `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
 
     } catch (err) {
         console.error(err);

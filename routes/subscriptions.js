@@ -14,13 +14,14 @@ router.get('/', authMiddleware, async (req, res) => {
         const client = req.app.discordClient;
         if (client) {
             const enrichedSubs = await Promise.all(subs.map(async sub => {
-                // Determine IDs/Tier (with fallback for safety)
-                const sId = sub.server_id || sub.guild_id || '';
-                const pTier = sub.plan_tier || sub.tier || 'Free';
+                // Determine IDs/Tier
+                const sId = sub.guild_id || '';
+                const pTier = sub.tier || 'Free';
 
                 let serverName = 'Unknown Server';
                 let userName = 'Unknown User';
                 let userHandle = 'unknown';
+                let userAvatar = null; // Initialize userAvatar
 
                 try {
                     // Fetch Guild Name
@@ -39,14 +40,14 @@ router.get('/', authMiddleware, async (req, res) => {
                         }
                     }
                 } catch (e) {
-                    console.warn(`[Enrichment] Failed for server ${sId}: ${e.message}`);
+                    console.warn(`[Enrichment] Failed for guild ${sId}: ${e.message}`);
                 }
 
                 // Explicitly return all fields plus enriched data
                 return {
-                    server_id: sId,
+                    guild_id: sId,
                     user_id: sub.user_id,
-                    plan_tier: pTier,
+                    tier: pTier,
                     expiry_date: sub.expiry_date,
                     is_active: sub.is_active,
                     auto_renew: sub.auto_renew, // Added auto_renew
@@ -127,22 +128,22 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
         };
 
         // All active subscriptions for distribution
-        const activeRes = await db.query('SELECT plan_tier, COUNT(*) FROM subscriptions WHERE is_active = TRUE GROUP BY plan_tier');
+        const activeRes = await db.query('SELECT tier, COUNT(*) FROM subscriptions WHERE is_active = TRUE GROUP BY tier');
         activeRes.rows.forEach(row => {
-            const tier = row.plan_tier;
+            const tier = row.tier;
             const count = parseInt(row.count);
             stats.tier_distribution.overall[tier] = count;
 
-            if (tier === 'Pro' || tier === 'Pro+') {
+            if (tier === 'Pro' || tier === 'Pro+' || tier === '1' || tier === '3' || tier === 1 || tier === 3) {
                 stats.tier_distribution.paid[tier] = count;
-            } else if (tier.includes('Trial')) {
+            } else if (String(tier).includes('Trial')) {
                 stats.tier_distribution.trial[tier] = count;
             }
         });
 
         // Retention Rate (Paid only: Active Pro/Pro+ / Total ever Pro/Pro+)
-        const totalPaidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE plan_tier IN ('Pro', 'Pro+')");
-        const activePaidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE AND plan_tier IN ('Pro', 'Pro+')");
+        const totalPaidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE tier IN ('Pro', 'Pro+', '1', '3')");
+        const activePaidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE AND tier IN ('Pro', 'Pro+', '1', '3')");
         const totalPaid = parseInt(totalPaidRes.rows[0].count);
         const activePaid = parseInt(activePaidRes.rows[0].count);
         stats.retention_rate = totalPaid > 0 ? Math.round((activePaid / totalPaid) * 100) : 0;
@@ -153,7 +154,7 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
                 TO_CHAR(COALESCE(start_date, created_at, NOW()), 'YYYY-MM') as month,
                 COUNT(*) as count
             FROM subscriptions 
-            WHERE plan_tier IN ('Pro', 'Pro+')
+            WHERE tier IN ('Pro', 'Pro+', '1', '3')
             AND COALESCE(start_date, created_at, NOW()) >= NOW() - INTERVAL '6 months'
             GROUP BY month
             ORDER BY month ASC
@@ -171,7 +172,7 @@ router.patch('/:id/auto-renew', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const { enabled } = req.body;
     try {
-        await db.query('UPDATE subscriptions SET auto_renew = $1 WHERE server_id = $2', [enabled, id]);
+        await db.query('UPDATE subscriptions SET auto_renew = $1 WHERE guild_id = $2', [enabled, id]);
 
         // Log
         const operatorId = req.user?.userId || 'Unknown';
@@ -205,8 +206,8 @@ router.get('/logs', authMiddleware, async (req, res) => {
 
 // POST /api/subscriptions
 router.post('/', authMiddleware, async (req, res) => {
-    const { server_id, user_id, tier, duration } = req.body;
-    if (!server_id || !user_id || !tier) {
+    const { guild_id, user_id, tier, duration } = req.body;
+    if (!guild_id || !user_id || !tier) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -231,8 +232,8 @@ router.post('/', authMiddleware, async (req, res) => {
         }
 
         await db.query(
-            'INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active, expiry_warning_sent) VALUES ($1, $2, $3, $4, TRUE, FALSE) ON CONFLICT (server_id) DO UPDATE SET user_id = EXCLUDED.user_id, plan_tier = EXCLUDED.plan_tier, expiry_date = EXCLUDED.expiry_date, is_active = TRUE, expiry_warning_sent = FALSE',
-            [server_id, user_id, tier, expiryDate]
+            'INSERT INTO subscriptions (guild_id, user_id, tier, expiry_date, is_active, expiry_warning_sent) VALUES ($1, $2, $3, $4, TRUE, FALSE) ON CONFLICT (guild_id) DO UPDATE SET user_id = EXCLUDED.user_id, tier = EXCLUDED.tier, expiry_date = EXCLUDED.expiry_date, is_active = TRUE, expiry_warning_sent = FALSE',
+            [guild_id, user_id, tier, expiryDate]
         );
 
         // Log
@@ -240,7 +241,7 @@ router.post('/', authMiddleware, async (req, res) => {
         await db.query(`
             INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
             VALUES ($1, $2, $3, 'CREATE', $4)
-        `, [req.user?.userId || 'Unknown', req.user?.username || 'Unknown', server_id, `Created ${tier} for ${duration}`]);
+        `, [req.user?.userId || 'Unknown', req.user?.username || 'Unknown', guild_id, `Created ${tier} for ${duration}`]);
 
         res.json({ success: true });
     } catch (err) {
@@ -260,7 +261,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         const operatorName = req.user?.username || 'Unknown';
 
         if (action === 'extend') {
-            const currentSub = await db.query('SELECT user_id, expiry_date, plan_tier FROM subscriptions WHERE server_id = $1', [id]);
+            const currentSub = await db.query('SELECT user_id, expiry_date, tier FROM subscriptions WHERE guild_id = $1', [id]);
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
             const subData = currentSub.rows[0];
@@ -284,7 +285,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             else if (unit === 'm') currentExpiry.setMonth(currentExpiry.getMonth() + amount);
             else if (unit === 'y') currentExpiry.setFullYear(currentExpiry.getFullYear() + amount);
 
-            await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE, expiry_warning_sent = FALSE WHERE server_id = $2', [currentExpiry, id]);
+            await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE, expiry_warning_sent = FALSE WHERE guild_id = $2', [currentExpiry, id]);
 
             // Log
             await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'EXTEND', $4)`,
@@ -292,14 +293,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
-                if (guild) await updateMemberRoles(guild, subData.user_id, subData.plan_tier);
+                if (guild) await updateMemberRoles(guild, subData.user_id, subData.tier);
             }
 
         } else if (action === 'update_tier') {
-            const currentSub = await db.query('SELECT user_id FROM subscriptions WHERE server_id = $1', [id]);
+            const currentSub = await db.query('SELECT user_id FROM subscriptions WHERE guild_id = $1', [id]);
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
-            await db.query('UPDATE subscriptions SET plan_tier = $1 WHERE server_id = $2', [tier, id]);
+            await db.query('UPDATE subscriptions SET tier = $1 WHERE guild_id = $2', [tier, id]);
 
             // Log
             await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'UPDATE_TIER', $4)`,
@@ -310,7 +311,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
                 if (guild) await updateMemberRoles(guild, currentSub.rows[0].user_id, tier);
             }
         } else if (action === 'toggle_active') {
-            await db.query('UPDATE subscriptions SET is_active = $1 WHERE server_id = $2', [is_active, id]);
+            await db.query('UPDATE subscriptions SET is_active = $1 WHERE guild_id = $2', [is_active, id]);
 
             // Log
             await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'TOGGLE_ACTIVE', $4)`,
@@ -327,7 +328,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
-        await db.query('UPDATE subscriptions SET is_active = FALSE WHERE server_id = $1', [id]);
+        await db.query('UPDATE subscriptions SET is_active = FALSE WHERE guild_id = $1', [id]);
 
         // Log
         const operatorId = req.user?.userId || 'Unknown';
@@ -345,7 +346,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id/delete', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
-        await db.query('DELETE FROM subscriptions WHERE server_id = $1', [id]);
+        await db.query('DELETE FROM subscriptions WHERE guild_id = $1', [id]);
 
         // Log
         const operatorId = req.user?.userId || 'Unknown';

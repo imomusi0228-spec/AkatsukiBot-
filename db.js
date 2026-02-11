@@ -11,52 +11,78 @@ const pool = new Pool({
 async function initDB() {
   const client = await pool.connect();
   try {
-    // 1. Migration: guild_id -> server_id
+    // 1. Migration: server_id -> guild_id (Unify with Akatsuki-Bot)
     try {
       const res = await client.query(`
         SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'subscriptions' AND column_name = 'guild_id'
+        WHERE table_name = 'subscriptions' AND column_name = 'server_id'
       `);
       if (res.rows.length > 0) {
         const check = await client.query(`
             SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'subscriptions' AND column_name = 'server_id'
+            WHERE table_name = 'subscriptions' AND column_name = 'guild_id'
         `);
         if (check.rows.length === 0) {
-          await client.query('ALTER TABLE subscriptions RENAME COLUMN guild_id TO server_id');
-          console.log('[DB] Migrated guild_id to server_id');
+          await client.query('ALTER TABLE subscriptions RENAME COLUMN server_id TO guild_id');
+          console.log('[DB] Migrated server_id to guild_id');
+        } else {
+          console.log('[DB] Both guild_id and server_id exist. Using guild_id.');
         }
       }
     } catch (e) {
       console.error('[DB] Guild ID Migration Error:', e.message);
     }
 
-    // 2. Migration: tier -> plan_tier
+    // 2. Migration: plan_tier -> tier (Unify with Akatsuki-Bot)
     try {
       const res = await client.query(`
         SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'subscriptions' AND column_name = 'tier'
+        WHERE table_name = 'subscriptions' AND column_name = 'plan_tier'
       `);
       if (res.rows.length > 0) {
         const check = await client.query(`
             SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'subscriptions' AND column_name = 'plan_tier'
+            WHERE table_name = 'subscriptions' AND column_name = 'tier'
         `);
         if (check.rows.length === 0) {
-          await client.query('ALTER TABLE subscriptions RENAME COLUMN tier TO plan_tier');
-          console.log('[DB] Migrated tier to plan_tier');
+          await client.query('ALTER TABLE subscriptions RENAME COLUMN plan_tier TO tier');
+          console.log('[DB] Migrated plan_tier to tier');
+        } else {
+          // If both exist, we might want to drop the old one if it's redundant
+          // For safety in this shared DB environment, let's just make sure tier is used.
+          console.log('[DB] Both tier and plan_tier exist. Using tier.');
         }
       }
     } catch (e) {
       console.error('[DB] Tier Migration Error:', e.message);
     }
 
-    // 3. Ensure tables exist
+    // 3. Migration: license_keys.plan_tier -> tier
+    try {
+      const res = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'license_keys' AND column_name = 'plan_tier'
+      `);
+      if (res.rows.length > 0) {
+        const check = await client.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'license_keys' AND column_name = 'tier'
+        `);
+        if (check.rows.length === 0) {
+          await client.query('ALTER TABLE license_keys RENAME COLUMN plan_tier TO tier');
+          console.log('[DB] Migrated license_keys.plan_tier to tier');
+        }
+      }
+    } catch (e) {
+      console.error('[DB] License Key Tier Migration Error:', e.message);
+    }
+
+    // 4. Ensure tables exist
     await client.query(`
       CREATE TABLE IF NOT EXISTS subscriptions (
-        server_id VARCHAR(255) PRIMARY KEY,
+        guild_id VARCHAR(255) PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
-        plan_tier VARCHAR(50) NOT NULL,
+        tier VARCHAR(50) NOT NULL,
         start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expiry_date TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE,
@@ -98,7 +124,7 @@ async function initDB() {
         author_name VARCHAR(255),
         content TEXT,
         parsed_user_id VARCHAR(255),
-        parsed_server_id VARCHAR(255),
+        parsed_guild_id VARCHAR(255),
         parsed_tier VARCHAR(50),
         parsed_booth_name VARCHAR(255),
         status VARCHAR(50) DEFAULT 'pending',
@@ -107,6 +133,26 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Migration for applications: parsed_server_id -> parsed_guild_id
+    try {
+      const res = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'applications' AND column_name = 'parsed_server_id'
+      `);
+      if (res.rows.length > 0) {
+        const check = await client.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'applications' AND column_name = 'parsed_guild_id'
+        `);
+        if (check.rows.length === 0) {
+          await client.query('ALTER TABLE applications RENAME COLUMN parsed_server_id TO parsed_guild_id');
+          console.log('[DB] Migrated parsed_server_id to parsed_guild_id');
+        }
+      }
+    } catch (e) {
+      console.error('[DB] App Server ID Migration Error:', e.message);
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
@@ -123,7 +169,7 @@ async function initDB() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS license_keys (
         key_id VARCHAR(50) PRIMARY KEY,
-        plan_tier VARCHAR(50) NOT NULL,
+        tier VARCHAR(50) NOT NULL,
         duration_months INTEGER NOT NULL,
         is_used BOOLEAN DEFAULT FALSE,
         used_by_user VARCHAR(255),
@@ -148,15 +194,13 @@ async function initDB() {
 
     // 4. Final Cleanup/Normalization
     try {
-      // Ensure plan_tier is VARCHAR and convert numeric values
+      // Ensure tier is VARCHAR in this bot's context for handling string names (Free/Pro/Pro+)
+      // but accommodate Akatsuki-Bot's numeric tier
       await client.query(`
-        ALTER TABLE subscriptions ALTER COLUMN plan_tier TYPE VARCHAR(50) USING plan_tier::VARCHAR;
+        ALTER TABLE subscriptions ALTER COLUMN tier TYPE VARCHAR(50) USING tier::VARCHAR;
       `);
 
-      // Convert numeric tiers to string names
-      await client.query("UPDATE subscriptions SET plan_tier = 'Pro' WHERE plan_tier = '1'");
-      await client.query("UPDATE subscriptions SET plan_tier = 'Pro+' WHERE plan_tier = '3'");
-      console.log('[DB] Normalized numeric tiers to names and ensured VARCHAR type.');
+      console.log('[DB] Ensured tier column is VARCHAR type for string names.');
     } catch (e) {
       console.error('[DB] Normalization Error:', e.message);
     }

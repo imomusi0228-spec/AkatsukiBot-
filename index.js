@@ -71,10 +71,10 @@ client.on(Events.GuildMemberAdd, async (member) => {
         const initialRoleId = process.env.ROLE_USER_ID;
         if (initialRoleId) await member.roles.add(initialRoleId).catch(() => null);
 
-        const res = await db.query('SELECT plan_tier FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [member.id]);
+        const res = await db.query('SELECT tier FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [member.id]);
         if (res.rows.length > 0) {
             let tier = 'Pro';
-            if (res.rows.some(r => r.plan_tier === 'Pro+')) tier = 'Pro+';
+            if (res.rows.some(r => r.tier === 'Pro+')) tier = 'Pro+';
             const { updateMemberRoles } = require('./sync');
             await updateMemberRoles(member.guild, member.id, tier);
         }

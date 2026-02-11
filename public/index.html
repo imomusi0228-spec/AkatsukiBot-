@@ -152,7 +152,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="sub in filteredSubscriptions" :key="sub.server_id">
+                            <tr v-for="sub in filteredSubscriptions" :key="sub.guild_id">
                                 <td>
                                     <span class="badge" :class="sub.is_active ? 'bg-success' : 'bg-danger'">
                                         {{ sub.is_active ? 'ACTIVE' : 'INACTIVE' }}
@@ -160,7 +160,7 @@
                                 </td>
                                 <td>
                                     <div class="fw-bold">{{ sub.server_name || 'Unknown' }}</div>
-                                    <code class="text-muted small">{{ sub.server_id }}</code>
+                                    <code class="text-muted small">{{ sub.guild_id }}</code>
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
@@ -177,12 +177,12 @@
                                 </td>
                                 <td>
                                     <span class="badge" :class="{
-                                    'badge-tier-trial-pro': sub.plan_tier === 'Trial Pro',
-                                    'badge-tier-trial-pro-plus': sub.plan_tier === 'Trial Pro+',
-                                    'badge-tier-pro': sub.plan_tier === 'Pro',
-                                    'badge-tier-pro-plus': sub.plan_tier === 'Pro+',
-                                    'bg-secondary': sub.plan_tier !== 'Pro' && sub.plan_tier !== 'Pro+' && sub.plan_tier !== 'Trial Pro' && sub.plan_tier !== 'Trial Pro+'
-                                }">{{ sub.plan_tier }}</span>
+                                    'badge-tier-trial-pro': sub.tier === 'Trial Pro',
+                                    'badge-tier-trial-pro-plus': sub.tier === 'Trial Pro+',
+                                    'badge-tier-pro': sub.tier === 'Pro' || sub.tier === '1' || sub.tier === 1,
+                                    'badge-tier-pro-plus': sub.tier === 'Pro+' || sub.tier === '3' || sub.tier === 3,
+                                    'bg-secondary': !['Pro', 'Pro+', 'Trial Pro', 'Trial Pro+', '1', '3', 1, 3].includes(sub.tier)
+                                }">{{ sub.tier }}</span>
                                 </td>
                                 <td class="text-center">
                                     <button class="btn btn-sm p-1"
@@ -206,7 +206,7 @@
                                     <button class="btn btn-sm btn-outline-light me-1"
                                         @click="openEditModal(sub)">編集</button>
                                     <button class="btn btn-sm btn-outline-danger"
-                                        @click="deactivateSub(sub.server_id)">停止</button>
+                                        @click="deactivateSub(sub)">停止</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -439,14 +439,14 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">詳細編集: {{ editModal.data.server_id }}</h5>
+                        <h5 class="modal-title">詳細編集: {{ editModal.data.guild_id }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-4">
                             <label class="form-label">プラン</label>
                             <div class="input-group">
-                                <select v-model="editModal.data.plan_tier" class="form-select">
+                                <select v-model="editModal.data.tier" class="form-select">
                                     <option value="Free">Free (無料)</option>
                                     <option value="Trial Pro">Trial Pro (お試しプロ)</option>
                                     <option value="Trial Pro+">Trial Pro+ (お試しプロプラス)</option>
@@ -511,18 +511,13 @@
                                 {{
                                 appDetailsModal.data.content }}</div>
                         </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted small">解析: BOOTH名</label>
-                                <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_booth_name ||
-                                    'N/A'
-                                    }}</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted small">解析: Tier</label>
-                                <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_tier || 'N/A' }}
-                                </div>
-                            </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">解析: ユーザーID</label>
+                            <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_user_id || 'N/A' }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">解析: サーバーID</label>
+                            <div class="form-control-plaintext">{{ appDetailsModal.data.parsed_guild_id || 'N/A' }}</div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -543,7 +538,7 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">サーバーID</label>
-                            <input type="text" v-model="addModal.data.server_id" class="form-control"
+                            <input type="text" v-model="addModal.data.guild_id" class="form-control"
                                 placeholder="Discord Guild ID">
                         </div>
                         <div class="mb-3">

@@ -27,12 +27,12 @@ async function handleApplicationMessage(message, client) {
         await db.query(`
             INSERT INTO applications (
                 message_id, channel_id, author_id, author_name, content,
-                parsed_user_id, parsed_server_id, parsed_tier, parsed_booth_name
+                parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (message_id) DO NOTHING
         `, [
             message.id, message.channel.id, message.author.id, message.author.tag, content,
-            parsed.userId, parsed.serverId, parsed.tier, parsed.boothName
+            parsed.userId, parsed.guildId, parsed.tier, parsed.boothName
         ]);
         console.log('[App] Application saved to database.');
 
@@ -60,7 +60,7 @@ function parseApplication(content) {
     return {
         boothName: boothMatch ? boothMatch[1].trim() : 'Unknown',
         userId: userMatch[1].trim(),
-        serverId: serverMatch[1].trim(),
+        guildId: serverMatch[1].trim(),
         tier: tier
     };
 }

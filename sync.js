@@ -99,24 +99,25 @@ async function syncSubscriptions(client) {
 
         if (tier !== 'Free') {
             try {
-                const res = await db.query('SELECT * FROM subscriptions WHERE user_id = $1', [memberId]);
+                const res = await db.query('SELECT guild_id, tier, is_active FROM subscriptions WHERE user_id = $1', [memberId]);
 
                 if (res.rows.length > 0) {
                     for (const row of res.rows) {
-                        const currentTier = row.plan_tier || '';
+                        const currentTier = String(row.tier || '');
                         // Don't downgrade Trial to regular Pro/Pro+ if it matches the intensity
-                        const isMatch = (currentTier === tier) || (currentTier === `Trial ${tier}`);
+                        const isMatch = (currentTier === tier) || (currentTier === `Trial ${tier}`) ||
+                            (tier === 'Pro' && (currentTier === '1' || currentTier === '2')) ||
+                            (tier === 'Pro+' && (currentTier === '3' || currentTier === '4'));
 
                         if (!isMatch || !row.is_active) {
                             try {
-                                // Identify correct server ID from row
-                                const sId = row.server_id;
+                                const sId = row.guild_id;
 
                                 await db.query(
                                     `UPDATE subscriptions SET 
-                                    plan_tier = $1,
+                                    tier = $1,
                                     is_active = TRUE 
-                                 WHERE server_id = $2`,
+                                 WHERE guild_id = $2`,
                                     [tier, sId]
                                 ).catch((err) => {
                                     console.error(`[Sync] Update failed for ${sId}:`, err.message);

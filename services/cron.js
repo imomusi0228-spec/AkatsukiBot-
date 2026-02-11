@@ -1,6 +1,9 @@
-const cron = require('node-cron');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../db');
 const { updateMemberRoles } = require('../sync');
+
+const TIER_VALUE_FREE = 'Free';
+const BOOTH_URL = 'https://imomusi0213.booth.pm/items/7935721';
 
 // Schedule: Run every 6 hours (0 */6 * * *) or for testing, every minute (* * * * *)
 // Let's settle on every hour for this use case
@@ -12,98 +15,88 @@ function startCron(client) {
     cron.schedule(SCHEDULE, async () => {
         console.log('[Cron] Running expiry check...');
         try {
+            // Helper to get tier name from numeric or string tier
+            const getTierName = (t) => {
+                if (t === '1' || t === 1) return 'Pro';
+                if (t === '2' || t === 2) return 'Pro (Yearly)';
+                if (t === '3' || t === 3) return 'Pro+';
+                if (t === '4' || t === 4) return 'Pro+ (Yearly)';
+                return t || 'Free';
+            };
+
             // 1. Check for subscriptions expiring within 7 days (warning notification)
-            const warningRes = await db.query(`
-                SELECT * FROM subscriptions 
-                WHERE is_active = TRUE 
-                AND plan_tier != 'Free'
-                AND expiry_date IS NOT NULL
-                AND expiry_date BETWEEN NOW() AND NOW() + INTERVAL '7 days'
-                AND expiry_warning_sent = FALSE
-            `);
+            const res = await db.query("SELECT guild_id, user_id, tier, expiry_date, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW() + INTERVAL '7 days' AND expiry_warning_sent = FALSE AND tier NOT IN ('Free', '0', 0)");
 
-            const warningSubs = warningRes.rows;
-            console.log(`[Cron] Found ${warningSubs.length} subscriptions expiring within 7 days.`);
+            for (const sub of res.rows) {
+                const guildId = sub.guild_id;
+                const tierName = getTierName(sub.tier);
 
-            const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
-            const boothUrl = process.env.BOOTH_URL || 'https://booth.pm/';
-
-            for (const sub of warningSubs) {
                 try {
-                    if (client && SUPPORT_GUILD_ID) {
-                        const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
-                        if (guild) {
-                            const member = await guild.members.fetch(sub.user_id).catch(() => null);
-                            if (member) {
-                                const expiryDate = new Date(sub.expiry_date).toLocaleDateString('ja-JP');
+                    const guild = await client.guilds.fetch(guildId).catch(() => null);
+                    const user = await client.users.fetch(sub.user_id).catch(() => null);
 
-                                let messageContent = `**【お知らせ】☾ サブスクリプション失効予告**\n\n平素より☾をご利用いただきありがとうございます。\n\nBotを導入しているサーバー (ID: ${sub.server_id}) の**${sub.plan_tier}プラン**が、**${expiryDate}**に失効予定です。\n\nプランが失効すると、自動的に**Freeプラン**へ変更され、Pro/Pro+機能がご利用いただけなくなります。\n継続してご利用いただくには、期限前にサブスクリプションの更新をお願いいたします。\n\n🛒 **プランの購入・更新はこちら:**\n${boothUrl}`;
+                    if (user) {
+                        const embed = new EmbedBuilder()
+                            .setTitle('📅 サブスクリプション期限のお知らせ')
+                            .setDescription(`ご利用ありがとうございます。お使いの **${tierName}プラン** の有効期限がまもなく終了します。`)
+                            .addFields(
+                                { name: 'サーバー', value: guild ? guild.name : `ID: ${guildId}` },
+                                { name: '期限', value: new Date(sub.expiry_date).toLocaleDateString() },
+                                { name: '自動更新', value: sub.auto_renew ? '有効 (自動的に更新されます)' : '無効 (期限後にFreeプランへ移行します)' }
+                            )
+                            .setColor(sub.auto_renew ? 0x00ff00 : 0xffa500)
+                            .setTimestamp();
 
-                                if (sub.plan_tier.includes('Trial')) {
-                                    messageContent = `**【お知らせ】☾ お試し期間終了間近**\n\nお嬢様／旦那様、☾ のフル機能を気に入っていただけましたか？\n\n現在ご利用中の**${sub.plan_tier}（お試し版）**は、**${expiryDate}**に期限を迎えます。\n期限が切れると一部の高度な機能が制限されますが、ご安心ください。本契約をいただければ、引き続きすべての機能をお楽しみいただけますよ。\n\nぜひ、この機会に本契約をご検討ください！ボクがお待ちしています。\n\n🛒 **本契約はこちらから:**\n${boothUrl}`;
-                                }
+                        const row = new ActionRowBuilder()
+                            .addComponents(
+                                new ButtonBuilder()
+                                    .setLabel('有料版をBOOTHで購入')
+                                    .setStyle(ButtonStyle.Link)
+                                    .setURL(BOOTH_URL)
+                            );
 
-                                await member.send({ content: messageContent }).catch(e => console.warn(`[Cron] Failed to send warning DM to ${member.user.tag}: ${e.message}`));
-
-                                // Mark as sent
-                                await db.query('UPDATE subscriptions SET expiry_warning_sent = TRUE WHERE server_id = $1', [sub.server_id]);
-
-                                // Log operation
-                                await db.query(`
-                                    INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
-                                    VALUES ($1, $2, $3, $4, $5)
-                                `, ['SYSTEM', 'AutoWarning', sub.server_id, 'EXPIRY_WARNING', `Plan: ${sub.plan_tier}, Expiry: ${expiryDate}${sub.plan_tier.includes('Trial') ? ' (Trial Solicit)' : ''}`]);
-
-                                console.log(`[Cron] Sent ${sub.plan_tier.includes('Trial') ? 'trial solicit' : 'expiry warning'} to user ${sub.user_id} for server ${sub.server_id}`);
-                            }
-                        }
+                        await user.send({ embeds: [embed], components: [row] }).catch(() => null);
+                        await db.query('UPDATE subscriptions SET expiry_warning_sent = TRUE WHERE guild_id = $1', [guildId]);
+                        console.log(`[Cron] Warning sent to user ${user.tag} for guild ${guildId}`);
                     }
                 } catch (err) {
-                    console.error(`[Cron] Error sending warning for ${sub.server_id}:`, err);
+                    console.error(`[Cron] Failed to process warning for guild ${guildId}:`, err.message);
                 }
             }
 
-            // 2. Find expired subscriptions that are still active
-            const res = await db.query(`
-                SELECT * FROM subscriptions 
-                WHERE is_active = TRUE 
-                AND expiry_date < NOW()
-            `);
+            // 2. Process expired and handle auto-renew
+            const expiredRes = await db.query("SELECT guild_id, user_id, tier, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW()");
 
-            const expiredSubs = res.rows;
-            console.log(`[Cron] Found ${expiredSubs.length} expired subscriptions.`);
+            for (const sub of expiredRes.rows) {
+                const guildId = sub.guild_id;
+                const tierName = getTierName(sub.tier);
 
-            for (const sub of expiredSubs) {
                 if (sub.auto_renew) {
-                    // AUTO-RENEW Logic
+                    // Extend by 1 month
                     const newExpiry = new Date();
                     newExpiry.setMonth(newExpiry.getMonth() + 1);
-
-                    await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE, expiry_warning_sent = FALSE WHERE server_id = $2', [newExpiry, sub.server_id]);
-
-                    // Log operation
-                    await db.query(`
-                        INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
-                        VALUES ($1, $2, $3, $4, $5)
-                    `, ['SYSTEM', 'AutoRenew', sub.server_id, 'AUTO_RENEW', `Plan: ${sub.plan_tier}, New Expiry: ${newExpiry.toLocaleDateString('ja-JP')}`]);
-
-                    console.log(`[Cron] Auto-renewed subscription for ${sub.server_id}`);
+                    await db.query('UPDATE subscriptions SET expiry_date = $1, expiry_warning_sent = FALSE WHERE guild_id = $2', [newExpiry, guildId]);
+                    console.log(`[Cron] Auto-renewed subscription for guild ${guildId} until ${newExpiry.toLocaleDateString()}`);
                 } else {
-                    // 1. Transition to Free tier in DB
-                    await db.query('UPDATE subscriptions SET plan_tier = $1, is_active = TRUE, expiry_date = NULL, auto_renew = FALSE WHERE server_id = $2', ['Free', sub.server_id]);
+                    // Move to Free
+                    await db.query('UPDATE subscriptions SET tier = $1, is_active = TRUE, expiry_date = NULL, auto_renew = FALSE WHERE guild_id = $2', [String(TIER_VALUE_FREE), guildId]);
 
-                    // 2. Log operation
-                    await db.query(`
-                        INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
-                        VALUES ($1, $2, $3, $4, $5)
-                    `, ['SYSTEM', 'AutoExpired', sub.server_id, 'AUTO_EXPIRE', `Plan: ${sub.plan_tier} -> Free`]);
-
-                    // 3. Remove roles in Support Server (Sync to Free)
-                    if (client && SUPPORT_GUILD_ID) {
-                        const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
-                        if (guild) await updateMemberRoles(guild, sub.user_id, 'Free');
+                    // Final announcement
+                    const user = await client.users.fetch(sub.user_id).catch(() => null);
+                    if (user) {
+                        await user.send(`【通知】サブスクリプションの有効期限が終了したため、サーバー (ID: ${guildId}) をFreeプランへ移行しました。`).catch(() => null);
                     }
-                    console.log(`[Cron] Transitioned expired subscription for ${sub.server_id} to Free tier.`);
+                    console.log(`[Cron] Expired subscription for guild ${guildId}, moved to Free.`);
+
+                    // Update roles
+                    const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
+                    if (SUPPORT_GUILD_ID) {
+                        const supportGuild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
+                        if (supportGuild) {
+                            // updateMemberRoles is already imported at the top
+                            await updateMemberRoles(supportGuild, sub.user_id, 'Free');
+                        }
+                    }
                 }
             }
         } catch (err) {

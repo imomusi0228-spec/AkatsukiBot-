@@ -17,7 +17,7 @@ const publicCommands = [
         .setName('activate')
         .setDescription('サーバーのサブスクリプションを有効化します')
         .addStringOption(option =>
-            option.setName('server_id').setDescription('サーバーID (サーバー内で使用する場合は省略可)').setRequired(false))
+            option.setName('guild_id').setDescription('サーバーID (サーバー内で使用する場合は省略可)').setRequired(false))
         .addStringOption(option =>
             option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false))
 ];

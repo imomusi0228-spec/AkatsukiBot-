@@ -31,8 +31,8 @@ createApp({
         const editModal = reactive({
             show: false,
             data: {
-                server_id: '',
-                plan_tier: 'Pro',
+                guild_id: '',
+                tier: 'Pro',
                 expiry_date: null,
                 auto_renew: false
             },
@@ -41,7 +41,7 @@ createApp({
         });
         const addModal = reactive({
             show: false,
-            data: { server_id: '', user_id: '', tier: 'Pro', duration: '1m' }
+            data: { guild_id: '', user_id: '', tier: 'Pro', duration: '1m' }
         });
         const keyModal = reactive({
             show: false,
@@ -60,7 +60,7 @@ createApp({
             if (searchQuery.value) {
                 const q = searchQuery.value.toLowerCase();
                 result = result.filter(sub =>
-                    (sub.server_id || '').toLowerCase().includes(q) ||
+                    (sub.guild_id || '').toLowerCase().includes(q) ||
                     (sub.user_display_name || '').toLowerCase().includes(q) ||
                     (sub.server_name || '').toLowerCase().includes(q)
                 );
@@ -144,15 +144,11 @@ createApp({
         };
 
         // Actions
-        const deactivateSub = async (id) => {
-            if (!confirm('ライセンスを無効化しますか？')) return;
-            await api(`/subscriptions/${id}`, 'DELETE');
-            loadData();
-        };
 
         const toggleAutoRenew = async (sub) => {
             const newState = !sub.auto_renew;
-            await api(`/subscriptions/${sub.server_id}/auto-renew`, 'PATCH', { enabled: newState });
+            const gId = sub.guild_id;
+            await api(`/subscriptions/${gId}/auto-renew`, 'PATCH', { enabled: newState });
             sub.auto_renew = newState;
         };
 
@@ -168,7 +164,8 @@ createApp({
         };
 
         const saveEdit = async () => {
-            await api(`/subscriptions/${editModal.data.server_id}`, 'PUT', {
+            const gId = editModal.data.guild_id;
+            await api(`/subscriptions/${gId}`, 'PUT', {
                 action: 'extend',
                 duration: editModal.extendDuration + editModal.extendUnit
             });
@@ -177,16 +174,17 @@ createApp({
         };
 
         const updateTier = async () => {
-            await api(`/subscriptions/${editModal.data.server_id}`, 'PUT', {
+            const gId = editModal.data.guild_id;
+            await api(`/subscriptions/${gId}`, 'PUT', {
                 action: 'update_tier',
-                tier: editModal.data.plan_tier
+                tier: editModal.data.tier
             });
             alert('プランを更新しました');
             loadData();
         }
 
         const createSub = async () => {
-            if (!addModal.data.server_id || !addModal.data.user_id) {
+            if (!addModal.data.guild_id || !addModal.data.user_id) {
                 alert('サーバーIDとユーザーIDは必須やな');
                 return;
             }
@@ -209,6 +207,13 @@ createApp({
         const deleteApp = async (id) => {
             if (!confirm('削除しますか？')) return;
             await api(`/applications/${id}`, 'DELETE');
+            loadData();
+        };
+
+        const deactivateSub = async (sub) => {
+            if (!confirm('ライセンスを無効化しますか？')) return;
+            const gId = sub.guild_id;
+            await api(`/subscriptions/${gId}`, 'DELETE');
             loadData();
         };
 
