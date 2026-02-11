@@ -11,6 +11,7 @@ const { commands, handleInteraction } = require('./commands');
 const { syncSubscriptions } = require('./sync');
 const { checkExpirations } = require('./expiry');
 const { startServer } = require('./server');
+const { startCron } = require('./services/cron');
 
 console.log('>>> Starting Bot Application...');
 
@@ -54,6 +55,7 @@ client.once(Events.ClientReady, async () => {
     };
 
     runBackgroundTasks();
+    startCron(client); // Start Cron Scheduler
     setInterval(runBackgroundTasks, 300000);
 });
 

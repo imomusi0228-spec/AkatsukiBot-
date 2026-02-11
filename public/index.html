@@ -1,553 +1,280 @@
 <!DOCTYPE html>
 <html lang="ja" data-bs-theme="dark">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AkatsukiBot ライセンス管理</title>
+    <title>AkatsukiBot | 管理コンソール</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #212529;
-            color: #f8f9fa;
-        }
-
-        .card {
-            background-color: #343a40;
-            border-color: #495057;
-        }
-
-        .status-active {
-            color: #198754;
-            font-weight: bold;
-        }
-
-        .status-inactive {
-            color: #dc3545;
-            font-weight: bold;
-        }
-
-        .table {
-            color: #f8f9fa;
-        }
-
-        .table-hover tbody tr:hover {
-            color: #f8f9fa;
-            background-color: rgba(255, 255, 255, 0.075);
-        }
-
-        .modal-content {
-            background-color: #343a40;
-            color: #f8f9fa;
-            border-color: #495057;
-        }
-
-        .modal-header,
-        .modal-footer {
-            border-color: #495057;
-        }
-
-        .btn-close {
-            filter: invert(1) grayscale(100%) brightness(200%);
-        }
-
-        .form-control,
-        .form-select {
-            background-color: #2b3035;
-            border-color: #495057;
-            color: #f8f9fa;
-        }
-
-        .form-control:focus,
-        .form-select:focus {
-            background-color: #2b3035;
-            color: #f8f9fa;
-            border-color: #86b7fe;
-        }
-
-        .pointer-cursor {
-            cursor: pointer;
-        }
-
-        .app-detail-container {
-            transition: all 0.3s ease;
-            font-size: 1.25rem;
-            /* 文字をさらに大きく */
-        }
-
-        .detail-item {
-            font-size: 1.1rem;
-            /* 詳細部分も読みやすく */
-            line-height: 1.6;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
-
 <body>
 
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>AkatsukiBot ライセンス管理</h1>
-            <button class="btn btn-outline-danger" onclick="logout()">ログアウト</button>
-        </div>
+<div id="app" v-cloak>
+    <!-- Loading State -->
+    <div v-if="loading && (user || isAdminLogged)" class="d-flex justify-content-center align-items-center vh-100">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
 
-        <!-- Auth Section -->
-        <div id="authSection" class="card p-4 text-center">
-            <h3>管理パネルへようこそ</h3>
-            <p>続行するにはDiscordでログインしてください。</p>
-            <div class="d-grid gap-2 col-6 mx-auto">
-                <a href="/api/auth/login" class="btn btn-primary btn-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="bi bi-discord" viewBox="0 0 16 16"
-                        style="margin-right: 8px; vertical-align: text-bottom;">
-                        <path
-                            d="M13.545 2.907a13.227 13.227 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.19 12.19 0 0 0-3.65 0c-.109-.256-.265-.583-.406-.833a.054.054 0 0 0-.052-.025c-1.108.284-2.19.622-3.257 1.011a.053.053 0 0 0-.011.027c-2.156 3.208-2.748 6.326-2.748 6.347a.054.054 0 0 0 .02.043c1.3.947 2.535 1.523 3.693 1.832a.053.053 0 0 0 .048-.02c.307-.425.576-.875.8-1.343a.053.053 0 0 0-.022-.054 8.167 8.167 0 0 1-1.277-.611.054.054 0 0 0-.005-.084 6.746 6.746 0 0 1 .253-.189.053.053 0 0 0 .052.007c2.628 1.203 5.467 1.203 8.05 0a.054.054 0 0 0 .053-.007c.083.064.168.129.253.189a.053.053 0 0 0-.005.084 8.162 8.162 0 0 1-1.277.611.054.054 0 0 0-.022.054c.224.473.497.923.805 1.343a.053.053 0 0 0 .047.02c1.158-.309 2.393-.88 3.693-1.827a.054.054 0 0 0 .02-.043c0-.021-.592-3.139-2.748-6.347a.05.05 0 0 0-.011-.027ZM5.32 9.074c-.79 0-1.433-.728-1.433-1.618 0-.885.633-1.618 1.433-1.618.8 0 1.443.733 1.443 1.618.005.89-.638 1.618-1.443 1.618Zm5.352 0c-.79 0-1.438-.728-1.438-1.618 0-.885.638-1.618 1.438-1.618.805 0 1.443.733 1.443 1.618.005.89-.638 1.618-1.443 1.618Z" />
-                    </svg>
-                    Discordでログイン
-                </a>
-                <button class="btn btn-sm btn-link text-muted mt-2" onclick="toggleAdminLogin()">管理者トークンでログイン</button>
-            </div>
-
-            <div id="adminLoginArea" class="mt-3" style="display:none;">
-                <div class="input-group mb-3">
-                    <input type="password" id="adminToken" class="form-control" placeholder="管理者トークン">
-                    <button class="btn btn-outline-secondary" onclick="loginWithToken()">Login</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Dashboard Section -->
-        <div id="dashboardSection" style="display:none;">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div id="userInfo" class="text-white small"></div>
-                <ul class="nav nav-tabs" id="myTab" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="subs-tab" data-bs-toggle="tab" data-bs-target="#subs"
-                            type="button" role="tab">サブスクリプション</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="apps-tab" data-bs-toggle="tab" data-bs-target="#apps" type="button"
-                            role="tab">申請一覧</button>
-                    </li>
-                </ul>
-            </div>
-
-            <div class="tab-content" id="myTabContent">
-                <!-- Subscriptions Tab -->
-                <div class="tab-pane fade show active" id="subs" role="tabpanel">
-                    <div class="d-flex justify-content-between mb-3">
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">新規追加</button>
-                        <div>
-                            <button class="btn btn-secondary me-2" onclick="syncRoles()">ロール同期</button>
-                        </div>
-                    </div>
-                    <div class="card p-3">
-                        <table class="table table-hover table-dark">
-                            <thead>
-                                <tr>
-                                    <th>サーバー名 / ID</th>
-                                    <th>対象ユーザー</th>
-                                    <th>Tier</th>
-                                    <th>ステータス</th>
-                                    <th>有効期限</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subsTableBody">
-                                <!-- Rows here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Apps Tab -->
-                <div class="tab-pane fade" id="apps" role="tabpanel">
-                    <button class="btn btn-sm btn-outline-secondary mb-2" onclick="fetchApps()">申請更新</button>
-                    <div class="card p-3">
-                        <table class="table table-sm table-dark">
-                            <thead>
-                                <tr>
-                                    <th>日時</th>
-                                    <th>Discordユーザー</th>
-                                    <th>申請詳細</th>
-                                    <th>ステータス</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="appsTableBody">
-                                <!-- Rows here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    <!-- Login Screen -->
+    <div v-if="!user && !isAdminLogged" class="container vh-100 d-flex flex-column justify-content-center align-items-center">
+        <div class="panel p-5 text-center" style="max-width: 400px; width: 100%;">
+            <h2 class="mb-4">AkatsukiBot<br><span class="fs-6 text-muted">Management Console</span></h2>
+            
+            <a href="/api/auth/login" class="btn btn-primary btn-lg w-100 mb-3 d-flex align-items-center justify-content-center">
+                <svg class="me-2" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M13.545 2.907a13.227 13.227 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.19 12.19 0 0 0-3.65 0c-.109-.256-.265-.583-.406-.833a.054.054 0 0 0-.052-.025c-1.108.284-2.19.622-3.257 1.011a.053.053 0 0 0-.011.027c-2.156 3.208-2.748 6.326-2.748 6.347a.054.054 0 0 0 .02.043c1.3.947 2.535 1.523 3.693 1.832a.053.053 0 0 0 .048-.02c.307-.425.576-.875.8-1.343a.053.053 0 0 0-.022-.054 8.167 8.167 0 0 1-1.277-.611.054.054 0 0 0-.005-.084 6.746 6.746 0 0 1 .253-.189.053.053 0 0 0 .052.007c2.628 1.203 5.467 1.203 8.05 0a.054.054 0 0 0 .053-.007c.083.064.168.129.253.189a.053.053 0 0 0-.005.084 8.162 8.162 0 0 1-1.277.611.054.054 0 0 0-.022.054c.224.473.497.923.805 1.343a.053.053 0 0 0 .047.02c1.158-.309 2.393-.88 3.693-1.827a.054.054 0 0 0 .02-.043c0-.021-.592-3.139-2.748-6.347a.05.05 0 0 0-.011-.027ZM5.32 9.074c-.79 0-1.433-.728-1.433-1.618 0-.885.633-1.618 1.433-1.618.8 0 1.443.733 1.443 1.618.005.89-.638 1.618-1.443 1.618Zm5.352 0c-.79 0-1.438-.728-1.438-1.618 0-.885.638-1.618 1.438-1.618.805 0 1.443.733 1.443 1.618.005.89-.638 1.618-1.443 1.618Z"/></svg>
+                Discord Login
+            </a>
+            
+            <div class="input-group">
+                <input type="password" id="tokenInput" class="form-control" placeholder="Admin Token (Local)">
+                <button class="btn btn-outline-secondary" @click="loginWithToken">Login</button>
             </div>
         </div>
     </div>
 
-    <!-- Key Result Modal -->
-    <div class="modal fade" id="keyModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">ライセンスキー発行成功</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- Main Dashboard -->
+    <div v-else class="container-fluid py-4">
+        <header class="d-flex justify-content-between align-items-center mb-4 px-3">
+            <h3 class="m-0 fw-bold">Dashboard</h3>
+            <div class="d-flex align-items-center">
+                <div v-if="user" class="me-3 d-flex align-items-center bg-dark rounded px-3 py-2">
+                    <img :src="'https://cdn.discordapp.com/avatars/' + user.id + '/' + user.avatar + '.png?size=32'" class="rounded-circle me-2" alt="">
+                    <span>{{ user.username }}</span>
                 </div>
-                <div class="modal-body text-center">
-                    <p>以下のキーをユーザーに送信してください：</p>
-                    <div class="input-group mb-3">
-                        <input type="text" id="resultKey" class="form-control text-center fw-bold fs-4" readonly>
-                        <button class="btn btn-outline-primary" onclick="copyResultKey()">コピー</button>
-                    </div>
-                    <p class="small text-muted">プラン: <span id="resultTier"></span></p>
+                <button class="btn btn-outline-danger btn-sm" @click="logout">ログアウト</button>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="row g-3 mb-4 px-3">
+            <div class="col-md-3">
+                <div class="panel stat-card text-center">
+                    <div class="stat-value text-accent">{{ stats.active_count }}</div>
+                    <div class="stat-label">有効ライセンス</div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+            <div class="col-md-3">
+                <div class="panel stat-card text-center">
+                    <div class="stat-value text-warning">{{ stats.expiring_soon_count }}</div>
+                    <div class="stat-label">7日以内に失効</div>
                 </div>
+            </div>
+            <div class="col-md-3">
+                <div class="panel stat-card text-center">
+                    <div class="stat-value text-success">{{ stats.new_this_month }}</div>
+                    <div class="stat-label">今月の新規</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="panel stat-card text-center">
+                    <div class="stat-value text-info">{{ stats.renewed_this_month }}</div>
+                    <div class="stat-label">今月の更新</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="d-flex justify-content-between align-items-center mb-3 px-3">
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <button class="nav-link" :class="{ active: activeTab === 'dashboard' }" @click="activeTab = 'dashboard'">ライセンス一覧</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" :class="{ active: activeTab === 'apps' }" @click="activeTab = 'apps'">申請管理</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" :class="{ active: activeTab === 'logs' }" @click="activeTab = 'logs'">操作ログ</button>
+                </li>
+            </ul>
+            
+            <div v-if="activeTab === 'dashboard'" class="d-flex gap-2">
+                <input type="text" id="searchInput" class="form-control form-control-sm" style="width: 250px;" 
+                       v-model="searchQuery" placeholder="検索 (Ctrl+K)">
+                
+                <select class="form-select form-select-sm" style="width: 150px;" v-model="filterStatus">
+                    <option value="all">すべて</option>
+                    <option value="active">有効のみ</option>
+                    <option value="expired">期限切れ</option>
+                    <option value="expiring">期限間近</option>
+                </select>
+
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">新規作成</button>
+            </div>
+        </div>
+
+        <!-- Tab Content: Dashboard (Subscriptions) -->
+        <div v-if="activeTab === 'dashboard'" class="px-3">
+            <div class="panel p-0 overflow-hidden">
+                <table class="table table-dark table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>有効</th>
+                            <th>サーバー</th>
+                            <th>ユーザー</th>
+                            <th>Tier</th>
+                            <th>期限</th>
+                            <th class="text-end">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="sub in filteredSubscriptions" :key="sub.server_id">
+                            <td>
+                                <span class="badge" :class="sub.is_active ? 'bg-success' : 'bg-danger'">
+                                    {{ sub.is_active ? 'ACTIVE' : 'INACTIVE' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-bold">{{ sub.server_name || 'Unknown' }}</div>
+                                <code class="text-muted small">{{ sub.server_id }}</code>
+                            </td>
+                            <td>
+                                <div>{{ sub.user_display_name }}</div>
+                                <div class="text-muted small">@{{ sub.user_handle }}</div>
+                            </td>
+                            <td><span class="badge bg-secondary">{{ sub.plan_tier }}</span></td>
+                            <td>
+                                <div :class="{'text-warning': new Date(sub.expiry_date) < new Date(Date.now() + 7*86400000)}">
+                                    {{ formatDate(sub.expiry_date) }}
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-light me-1" @click="extendSub(sub.server_id, 30)" title="+30日">+30d</button>
+                                <button class="btn btn-sm btn-outline-light me-1" @click="openEditModal(sub)">編集</button>
+                                <button class="btn btn-sm btn-outline-danger" @click="deactivateSub(sub.server_id)">停止</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Content: Applications -->
+        <div v-if="activeTab === 'apps'" class="px-3">
+            <div class="d-flex justify-content-end mb-2">
+                <button class="btn btn-sm btn-secondary" @click="loadData">更新</button>
+            </div>
+            <div class="panel p-0 overflow-hidden">
+                <table class="table table-dark table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>Discord User</th>
+                            <th>BOOTH名 / 希望</th>
+                            <th>状態</th>
+                            <th class="text-end">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="app in applications" :key="app.id">
+                            <td>{{ new Date(app.created_at).toLocaleString('ja-JP') }}</td>
+                            <td>{{ app.author_name }}<br><small class="text-muted">{{ app.author_id }}</small></td>
+                            <td>
+                                <div class="fw-bold">{{ app.parsed_booth_name || 'N/A' }}</div>
+                                <span class="badge bg-dark border">{{ app.parsed_tier }}</span>
+                            </td>
+                            <td>
+                                <span class="badge" :class="{
+                                    'bg-success': app.status === 'approved',
+                                    'bg-warning': app.status === 'pending',
+                                    'bg-danger': app.status === 'rejected'
+                                }">{{ app.status }}</span>
+                            </td>
+                            <td class="text-end">
+                                <div v-if="app.status === 'pending'">
+                                    <button class="btn btn-sm btn-success me-1" @click="approveApp(app)">承認</button>
+                                    <button class="btn btn-sm btn-danger" @click="deleteApp(app.id)">拒否</button>
+                                </div>
+                                <div v-else>
+                                    <button class="btn btn-sm btn-outline-danger" @click="deleteApp(app.id)">削除</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Content: Logs -->
+        <div v-if="activeTab === 'logs'" class="px-3">
+            <div class="panel p-0 overflow-hidden">
+                 <table class="table table-dark table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Operator</th>
+                            <th>Action</th>
+                            <th>Target</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="log in logs" :key="log.id">
+                             <td><small>{{ new Date(log.created_at).toLocaleString() }}</small></td>
+                             <td>{{ log.operator_name }}</td>
+                             <td><span class="badge bg-secondary">{{ log.action_type }}</span></td>
+                             <td><code class="small">{{ log.target_id }}</code></td>
+                             <td>{{ log.details }}</td>
+                        </tr>
+                    </tbody>
+                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Add Subscription Modal -->
-    <div class="modal fade" id="addModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">新規サブスクリプション追加</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">サーバーID</label>
-                        <input type="text" id="addServerId" class="form-control" placeholder="1234567890">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">ユーザーID</label>
-                        <input type="text" id="addUserId" class="form-control" placeholder="9876543210">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tier (Pro / Pro+)</label>
-                        <select id="addTier" class="form-select">
-                            <option value="Pro">Pro</option>
-                            <option value="Pro+">Pro+</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">延長期間（月）</label>
-                        <input type="number" id="addDuration" class="form-control" value="1" min="1">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                    <button type="button" class="btn btn-primary" onclick="addSubscription()">追加</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit/Extend Modal -->
+    <!-- Edit Modal -->
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">サブスクリプション編集</h5>
+                    <h5 class="modal-title">詳細編集: {{ editModal.data.server_id }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" id="editServerId">
                     <div class="mb-4">
-                        <h6>期間延長</h6>
+                        <label class="form-label">プラン</label>
                         <div class="input-group">
-                            <input type="number" id="extendDuration" class="form-control" value="1" min="1">
-                            <span class="input-group-text">ヶ月</span>
-                            <button class="btn btn-success" onclick="extendSub()">延長実行</button>
-                        </div>
-                    </div>
-                    <hr>
-                    <div class="mb-4">
-                        <h6>Tier 変更</h6>
-                        <div class="input-group">
-                            <select id="editTier" class="form-select">
+                            <select v-model="editModal.data.plan_tier" class="form-select">
                                 <option value="Pro">Pro</option>
                                 <option value="Pro+">Pro+</option>
                             </select>
-                            <button class="btn btn-primary" onclick="updateTier()">変更保存</button>
+                            <button class="btn btn-outline-primary" @click="updateTier">変更保存</button>
                         </div>
                     </div>
-                    <hr>
-                    <div class="d-flex justify-content-between">
-                        <button class="btn btn-warning" onclick="cancelSub()">無効化(キャンセル)</button>
-                        <button class="btn btn-danger" onclick="deleteSub()">完全削除</button>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">期間延長 (月)</label>
+                        <div class="input-group">
+                             <input type="number" v-model="editModal.extendDuration" class="form-control" min="1">
+                             <button class="btn btn-success" @click="saveEdit">延長実行</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- Key Modal -->
+    <div class="modal fade" id="keyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">License Key Issued</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="display-6 user-select-all">{{ keyModal.key }}</p>
+                    <p class="text-muted">{{ keyModal.tier }} License</p>
+                    <button class="btn btn-primary" @click="copyText(keyModal.key)">Copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const API_URL = '/api';
-        let adminToken = localStorage.getItem('admin_token');
+</div>
 
-        checkAuth();
-
-        function toggleAdminLogin() {
-            const area = document.getElementById('adminLoginArea');
-            area.style.display = area.style.display === 'none' ? 'block' : 'none';
-        }
-
-        async function checkAuth() {
-            try {
-                const res = await fetch('/api/auth/status');
-                const data = await res.json();
-                if (data.authenticated) {
-                    showDashboard(data.user);
-                    return;
-                }
-            } catch (e) { console.error(e); }
-
-            if (adminToken) {
-                try {
-                    const res = await apiRequest('/subscriptions');
-                    if (res) {
-                        showDashboard({ username: 'Admin (Token)' });
-                        return;
-                    }
-                } catch (e) { }
-            }
-
-            document.getElementById('authSection').style.display = 'block';
-            document.getElementById('dashboardSection').style.display = 'none';
-        }
-
-        function loginWithToken() {
-            const token = document.getElementById('adminToken').value;
-            if (token) {
-                localStorage.setItem('admin_token', token);
-                adminToken = token;
-                checkAuth();
-            }
-        }
-
-        async function logout() {
-            localStorage.removeItem('admin_token');
-            adminToken = null;
-            await fetch('/api/auth/logout', { method: 'POST' });
-            location.reload();
-        }
-
-        function showDashboard(user) {
-            document.getElementById('authSection').style.display = 'none';
-            document.getElementById('dashboardSection').style.display = 'block';
-
-            if (user) {
-                let userInfoHtml = `Logged in as <strong>${user.username}</strong>`;
-                if (user.avatar && user.id) {
-                    userInfoHtml = `<img src="https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=32" class="rounded-circle me-2" alt="Avatar">` + userInfoHtml;
-                }
-                document.getElementById('userInfo').innerHTML = userInfoHtml;
-            }
-
-            fetchSubscriptions();
-            fetchApps();
-        }
-
-        async function apiRequest(endpoint, method = 'GET', body = null) {
-            const headers = { 'Content-Type': 'application/json' };
-            if (adminToken) headers['Authorization'] = adminToken;
-            const options = { method, headers };
-            if (body) options.body = JSON.stringify(body);
-
-            const res = await fetch(API_URL + endpoint, options);
-            if (res.status === 401) {
-                if (adminToken) {
-                    alert('セッション有効期限切れ、または認証エラーです。');
-                    logout();
-                } else {
-                    location.reload();
-                }
-                return null;
-            }
-            return res.json();
-        }
-
-        async function fetchSubscriptions() {
-            const data = await apiRequest('/subscriptions');
-            if (!data) return;
-            const tbody = document.getElementById('subsTableBody');
-            tbody.innerHTML = '';
-            data.forEach(sub => {
-                const tr = document.createElement('tr');
-                const expiry = sub.expiry_date ? new Date(sub.expiry_date).toLocaleDateString() : '無期限';
-                const statusClass = sub.is_active ? 'status-active' : 'status-inactive';
-                const statusText = sub.is_active ? '有効' : '無効';
-
-                tr.innerHTML = `
-                <td>
-                    <div class="fw-bold text-info">${sub.server_name || 'Unknown'}</div>
-                    <code class="small text-muted">${sub.server_id}</code>
-                </td>
-                <td>
-                    <div class="fw-bold fs-6">${sub.user_display_name}</div>
-                    <div class="small text-muted">@${sub.user_handle}</div>
-                </td>
-                <td><span class="badge bg-primary">${sub.plan_tier}</span></td>
-                <td class="${statusClass}">${statusText}</td>
-                <td>${expiry}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-light" onclick="openEditModal('${sub.server_id}', '${sub.plan_tier}')">編集</button>
-                </td>
-            `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function fetchApps() {
-            const data = await apiRequest('/applications');
-            if (!data) return;
-            const tbody = document.getElementById('appsTableBody');
-            tbody.innerHTML = '';
-            data.forEach(app => {
-                const tr = document.createElement('tr');
-                const statusBadge = app.status === 'approved' ? '<span class="badge bg-success">承認済み</span>' :
-                    app.status === 'rejected' ? '<span class="badge bg-danger">拒否</span>' :
-                        app.status === 'cancelled' ? '<span class="badge bg-secondary">キャンセル</span>' :
-                            '<span class="badge bg-warning">保留中</span>';
-
-                const detailHtml = `
-                    <div class="app-detail-container pointer-cursor" onclick="toggleDetails(${app.id})">
-                        <div class="fw-bold text-info fs-4">${app.parsed_booth_name || '不明'} <span class="text-muted" style="font-size: 0.7em;">▼ タップで詳細表示</span></div>
-                        <div id="extra-details-${app.id}" class="d-none mt-3 border-start border-4 border-info ps-3 detail-item bg-dark p-3 rounded">
-                            <div class="mb-2"><strong>購入者名（BOOTH）：</strong> ${app.parsed_booth_name || '不明'}</div>
-                            <div class="mb-2"><strong>サーバーID：</strong> <code class="fs-5">${app.parsed_server_id || '不明'}</code></div>
-                            <div class="mb-2"><strong>ユーザーID：</strong> <code class="fs-5">${app.parsed_user_id || '不明'}</code></div>
-                            <div class="mb-2"><strong>希望プラン：</strong> <span class="badge bg-primary fs-6">${app.parsed_tier || '不明'}</span></div>
-                        </div>
-                    </div>
-                `;
-
-                let actionButtons = '';
-                if (app.status === 'pending') {
-                    actionButtons = `
-                        <button class="btn btn-sm btn-success me-1" onclick="approveApp(${app.id})">承認</button>
-                        <button class="btn btn-sm btn-danger me-1" onclick="rejectApp(${app.id})">拒否</button>
-                    `;
-                } else if (app.status === 'approved' && app.license_key) {
-                    actionButtons = `
-                        <button class="btn btn-sm btn-outline-info me-1" onclick="showKeyInfo('${app.license_key}', '${app.parsed_tier}')">キー表示</button>
-                    `;
-                }
-
-                // Add Delete button to all
-                actionButtons += `<button class="btn btn-sm btn-outline-danger" onclick="deleteApp(${app.id})">削除</button>`;
-
-                tr.innerHTML = `
-                    <td><small>${new Date(app.created_at).toLocaleString('ja-JP')}</small></td>
-                    <td>${app.author_name}<br><small class="text-muted">${app.author_id}</small></td>
-                    <td>${detailHtml}</td>
-                    <td>${statusBadge}</td>
-                    <td>${actionButtons}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function approveApp(id) {
-            if (!confirm('この申請を承認し、ライセンスキーを発行しますか？')) return;
-            const res = await apiRequest(`/applications/${id}/approve`, 'POST');
-            if (res && res.success) {
-                fetchApps();
-                showKeyInfo(res.key, res.tier);
-            }
-        }
-
-        async function deleteApp(id) {
-            if (!confirm('この申請記録を完全に削除しますか？（発行済みのキーは無効化されません）')) return;
-            const res = await apiRequest(`/applications/${id}`, 'DELETE');
-            if (res && res.success) {
-                fetchApps();
-            }
-        }
-
-        function toggleDetails(id) {
-            const el = document.getElementById(`extra-details-${id}`);
-            if (el) {
-                el.classList.toggle('d-none');
-            }
-        }
-
-        function showKeyInfo(key, tier) {
-            document.getElementById('resultKey').value = key;
-            document.getElementById('resultTier').innerText = tier;
-            new bootstrap.Modal(document.getElementById('keyModal')).show();
-        }
-
-        function copyResultKey() {
-            navigator.clipboard.writeText(document.getElementById('resultKey').value);
-            alert('コピーしました！');
-        }
-
-        async function rejectApp(id) {
-            if (!confirm('拒否しますか？')) return;
-            const res = await apiRequest(`/applications/${id}/reject`, 'POST');
-            if (res && res.success) fetchApps();
-        }
-
-        async function addSubscription() {
-            const body = {
-                server_id: document.getElementById('addServerId').value,
-                user_id: document.getElementById('addUserId').value,
-                tier: document.getElementById('addTier').value,
-                duration: document.getElementById('addDuration').value + 'm'
-            };
-            const res = await apiRequest('/subscriptions', 'POST', body);
-            if (res && res.success) {
-                bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
-                fetchSubscriptions();
-            } else alert(res.error || '失敗しました');
-        }
-
-        function openEditModal(serverId, tier) {
-            document.getElementById('editServerId').value = serverId;
-            document.getElementById('editTier').value = tier;
-            new bootstrap.Modal(document.getElementById('editModal')).show();
-        }
-
-        async function extendSub() {
-            const id = document.getElementById('editServerId').value;
-            const durationInput = document.getElementById('extendDuration').value;
-            const duration = durationInput + 'm';
-            const res = await apiRequest(`/subscriptions/${id}`, 'PUT', { action: 'extend', duration });
-            if (res && res.success) { fetchSubscriptions(); alert('延長しました！'); }
-        }
-
-        async function updateTier() {
-            const id = document.getElementById('editServerId').value;
-            const tier = document.getElementById('editTier').value;
-            const res = await apiRequest(`/subscriptions/${id}`, 'PUT', { action: 'update_tier', tier });
-            if (res && res.success) fetchSubscriptions();
-        }
-
-        async function cancelSub() {
-            if (!confirm('キャンセルしますか？')) return;
-            const id = document.getElementById('editServerId').value;
-            const res = await apiRequest(`/subscriptions/${id}`, 'DELETE');
-            if (res && res.success) { bootstrap.Modal.getInstance(document.getElementById('editModal')).hide(); fetchSubscriptions(); }
-        }
-
-        async function deleteSub() {
-            if (!confirm('完全削除しますか？')) return;
-            const id = document.getElementById('editServerId').value;
-            const res = await apiRequest(`/subscriptions/${id}/delete`, 'DELETE');
-            if (res && res.success) { bootstrap.Modal.getInstance(document.getElementById('editModal')).hide(); fetchSubscriptions(); }
-        }
-
-        async function syncRoles() {
-            if (!confirm('同期を開始しますか？')) return;
-            const res = await apiRequest('/sync', 'POST');
-            if (res) { alert(`同期完了。更新数: ${res.updated || 0}`); fetchSubscriptions(); }
-        }
-    </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/app.js"></script>
 </body>
-
 </html>

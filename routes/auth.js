@@ -135,6 +135,19 @@ router.get('/callback', async (req, res) => {
         });
 
         const user = userResponse.data;
+
+        // --- Whitelist Check ---
+        const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
+        // Also allow if ADMIN_TOKEN is used (handled in middleware, but here we are login via Discord)
+        // If ADMIN_DISCORD_IDS is not set, we might want to default to blocking or allowing only the owner?
+        // For now, if the list is empty, we warn but might block.
+        // Let's strictly enforce:
+        if (allowedIds.length > 0 && !allowedIds.includes(user.id)) {
+            console.warn(`[OAuth] Access denied for user ID: ${user.id} (${user.username}). Not in valid list.`);
+            return res.status(403).send('<h1>403 Forbidden</h1><p>You are not authorized to access this dashboard.</p><a href="/">Return to Home</a>');
+        }
+        // -----------------------
+
         const sessionId = crypto.randomUUID();
         const expiry = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
 

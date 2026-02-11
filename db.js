@@ -129,6 +129,19 @@ async function initDB() {
     }
 
 
+    // operation_logs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS operation_logs (
+        id SERIAL PRIMARY KEY,
+        operator_id VARCHAR(255) NOT NULL,
+        operator_name VARCHAR(255),
+        target_id VARCHAR(255),
+        action_type VARCHAR(50) NOT NULL,
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables initialized.');
   } catch (err) {
     console.error('Error initializing database:', err);

@@ -62,6 +62,72 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
+// GET /api/stats
+router.get('/stats', authMiddleware, async (req, res) => {
+    try {
+        const stats = {
+            active_count: 0,
+            expiring_soon_count: 0,
+            new_this_month: 0,
+            renewed_this_month: 0
+        };
+
+        // Active Count
+        const activeRes = await db.query('SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE');
+        stats.active_count = parseInt(activeRes.rows[0].count);
+
+        // Expiring Soon (within 7 days)
+        const expiringRes = await db.query(`
+            SELECT COUNT(*) FROM subscriptions 
+            WHERE is_active = TRUE 
+            AND expiry_date BETWEEN NOW() AND NOW() + INTERVAL '7 days'
+        `);
+        stats.expiring_soon_count = parseInt(expiringRes.rows[0].count);
+
+        // New/Renewed This Month (Approximation using operation_logs or created_at if we had it)
+        // Since we don't have created_at on subscriptions (we do, start_date), let's use start_date for new.
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const newRes = await db.query(`
+            SELECT COUNT(*) FROM subscriptions 
+            WHERE start_date >= $1
+        `, [startOfMonth]);
+        stats.new_this_month = parseInt(newRes.rows[0].count);
+
+        // Renewed (Log based)
+        const renewedRes = await db.query(`
+            SELECT COUNT(*) FROM operation_logs 
+            WHERE action_type = 'EXTEND' 
+            AND created_at >= $1
+        `, [startOfMonth]);
+        stats.renewed_this_month = parseInt(renewedRes.rows[0].count);
+
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/logs (Self History)
+router.get('/logs', authMiddleware, async (req, res) => {
+    try {
+        // Return logs where operator is this user OR system logs
+        // Since it's a personal tool, maybe just show last 50 logs?
+        const limit = 50;
+        const result = await db.query(`
+            SELECT * FROM operation_logs 
+            ORDER BY created_at DESC 
+            LIMIT $1
+        `, [limit]);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // POST /api/subscriptions
 router.post('/', authMiddleware, async (req, res) => {
     const { server_id, user_id, tier, duration } = req.body;
@@ -93,6 +159,14 @@ router.post('/', authMiddleware, async (req, res) => {
             'INSERT INTO subscriptions (server_id, user_id, plan_tier, expiry_date, is_active) VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (server_id) DO UPDATE SET user_id = EXCLUDED.user_id, plan_tier = EXCLUDED.plan_tier, expiry_date = EXCLUDED.expiry_date, is_active = TRUE',
             [server_id, user_id, tier, expiryDate]
         );
+
+        // Log
+        const operator = req.user ? `${req.user.username} (${req.user.userId})` : 'Unknown';
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
+            VALUES ($1, $2, $3, 'CREATE', $4)
+        `, [req.user?.userId || 'Unknown', req.user?.username || 'Unknown', server_id, `Created ${tier} for ${duration}`]);
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -107,6 +181,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
 
     try {
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+
         if (action === 'extend') {
             const currentSub = await db.query('SELECT user_id, expiry_date, plan_tier FROM subscriptions WHERE server_id = $1', [id]);
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -134,6 +211,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
             await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE WHERE server_id = $2', [currentExpiry, id]);
 
+            // Log
+            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'EXTEND', $4)`,
+                [operatorId, operatorName, id, `Extended by ${duration}`]);
+
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
                 if (guild) await updateMemberRoles(guild, subData.user_id, subData.plan_tier);
@@ -145,12 +226,20 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
             await db.query('UPDATE subscriptions SET plan_tier = $1 WHERE server_id = $2', [tier, id]);
 
+            // Log
+            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'UPDATE_TIER', $4)`,
+                [operatorId, operatorName, id, `Changed to ${tier}`]);
+
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
                 if (guild) await updateMemberRoles(guild, currentSub.rows[0].user_id, tier);
             }
         } else if (action === 'toggle_active') {
             await db.query('UPDATE subscriptions SET is_active = $1 WHERE server_id = $2', [is_active, id]);
+
+            // Log
+            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'TOGGLE_ACTIVE', $4)`,
+                [operatorId, operatorName, id, `Set active to ${is_active}`]);
         }
 
         res.json({ success: true });
@@ -164,6 +253,13 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
         await db.query('UPDATE subscriptions SET is_active = FALSE WHERE server_id = $1', [id]);
+
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'DEACTIVATE', 'Soft Delete')`,
+            [operatorId, operatorName, id]);
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -175,6 +271,13 @@ router.delete('/:id/delete', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
         await db.query('DELETE FROM subscriptions WHERE server_id = $1', [id]);
+
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'DELETE', 'Hard Delete')`,
+            [operatorId, operatorName, id]);
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
