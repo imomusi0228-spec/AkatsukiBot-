@@ -159,7 +159,7 @@ router.patch('/:id/auto-renew', authMiddleware, async (req, res) => {
     const { enabled } = req.body;
     try {
         await db.query('UPDATE subscriptions SET auto_renew = $1 WHERE server_id = $2', [enabled, id]);
-        
+
         // Log
         const operatorId = req.user?.userId || 'Unknown';
         const operatorName = req.user?.username || 'Unknown';
@@ -254,7 +254,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             let currentExpiry = subData.expiry_date ? new Date(subData.expiry_date) : new Date();
             if (currentExpiry < new Date()) currentExpiry = new Date();
 
-            const match = String(duration).match(/^(\d+)([dmy])$/);
+            const match = String(duration).match(/^(-?\d+)([dmy])$/);
             let amount, unit;
 
             if (match) {

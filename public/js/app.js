@@ -143,12 +143,6 @@ createApp({
         };
 
         // Actions
-        const extendSub = async (id, days) => {
-            if (!confirm(`期間を ${days}日 延長しますか？`)) return;
-            await api(`/subscriptions/${id}`, 'PUT', { action: 'extend', duration: `${days}d` });
-            loadData();
-        };
-
         const deactivateSub = async (id) => {
             if (!confirm('ライセンスを無効化しますか？')) return;
             await api(`/subscriptions/${id}`, 'DELETE');
@@ -186,9 +180,19 @@ createApp({
                 action: 'update_tier',
                 tier: editModal.data.plan_tier
             });
-            alert('Tier updated');
+            alert('プランを更新しました');
             loadData();
         }
+
+        const createSub = async () => {
+            if (!addModal.data.server_id || !addModal.data.user_id) {
+                alert('サーバーIDとユーザーIDは必須やな');
+                return;
+            }
+            await api('/subscriptions', 'POST', addModal.data);
+            bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+            loadData();
+        };
 
         const approveApp = async (app) => {
             if (!confirm('承認してキーを発行しますか？')) return;
@@ -248,7 +252,7 @@ createApp({
             searchQuery, filterStatus,
             editModal, addModal, keyModal, appDetailsModal,
             formatDate, extendSub, deactivateSub, toggleAutoRenew, copyText,
-            openEditModal, saveEdit, updateTier,
+            openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData
         };

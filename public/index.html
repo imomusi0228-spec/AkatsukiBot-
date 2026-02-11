@@ -148,9 +148,11 @@
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <img v-if="sub.user_avatar" :src="'https://cdn.discordapp.com/avatars/' + sub.user_id + '/' + sub.user_avatar + '.png?size=32'"
+                                        <img v-if="sub.user_avatar"
+                                            :src="'https://cdn.discordapp.com/avatars/' + sub.user_id + '/' + sub.user_avatar + '.png?size=32'"
                                             class="rounded-circle me-2" alt="" width="24" height="24">
-                                        <div v-else class="rounded-circle me-2 bg-secondary d-inline-block" style="width: 24px; height: 24px;"></div>
+                                        <div v-else class="rounded-circle me-2 bg-secondary d-inline-block"
+                                            style="width: 24px; height: 24px;"></div>
                                         <div>
                                             <div class="small fw-bold text-nowrap">{{ sub.user_display_name }}</div>
                                             <div class="text-muted extra-small">@{{ sub.user_handle }}</div>
@@ -165,11 +167,14 @@
                                 }">{{ sub.plan_tier }}</span>
                                 </td>
                                 <td class="text-center">
-                                    <button class="btn btn-sm p-1" :class="sub.auto_renew ? 'text-success' : 'text-muted'"
+                                    <button class="btn btn-sm p-1"
+                                        :class="sub.auto_renew ? 'text-success' : 'text-muted'"
                                         @click="toggleAutoRenew(sub)" :title="sub.auto_renew ? '自動更新有効' : '自動更新無効'">
                                         <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                                            <path fill-rule="evenodd"
+                                                d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
+                                            <path
+                                                d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z" />
                                         </svg>
                                     </button>
                                 </td>
@@ -180,8 +185,6 @@
                                     </div>
                                 </td>
                                 <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-light me-1"
-                                        @click="extendSub(sub.server_id, 30)" title="+30日">+30d</button>
                                     <button class="btn btn-sm btn-outline-light me-1"
                                         @click="openEditModal(sub)">編集</button>
                                     <button class="btn btn-sm btn-outline-danger"
@@ -214,9 +217,11 @@
                                 <td>{{ new Date(app.created_at).toLocaleString('ja-JP') }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <img v-if="app.user_avatar" :src="'https://cdn.discordapp.com/avatars/' + app.author_id + '/' + app.user_avatar + '.png?size=32'"
+                                        <img v-if="app.user_avatar"
+                                            :src="'https://cdn.discordapp.com/avatars/' + app.author_id + '/' + app.user_avatar + '.png?size=32'"
                                             class="rounded-circle me-2" alt="" width="24" height="24">
-                                        <div v-else class="rounded-circle me-2 bg-secondary d-inline-block" style="width: 24px; height: 24px;"></div>
+                                        <div v-else class="rounded-circle me-2 bg-secondary d-inline-block"
+                                            style="width: 24px; height: 24px;"></div>
                                         <div>
                                             <div class="small fw-bold text-nowrap">{{ app.user_display_name }}</div>
                                             <div class="text-muted extra-small">@{{ app.user_handle }}</div>
@@ -283,17 +288,21 @@
                     </table>
                 </div>
             </div>
-            
+
             <!-- Tab Content: Statistics (Analysis) -->
             <div v-if="activeTab === 'stats'" class="px-3">
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="panel">
                             <h5 class="mb-3">Tier分布</h5>
-                            <div v-for="(count, tier) in detailedStats.tier_distribution" :key="tier" class="d-flex justify-content-between align-items-center mb-2">
+                            <div v-for="(count, tier) in detailedStats.tier_distribution" :key="tier"
+                                class="d-flex justify-content-between align-items-center mb-2">
                                 <span>{{ tier }}</span>
-                                <div class="flex-grow-1 mx-3" style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px;">
-                                    <div :style="{ width: (count / stats.active_count * 100) + '%', background: tier === 'Pro+' ? 'var(--warning)' : 'var(--primary)', height: '100%', borderRadius: '4px' }"></div>
+                                <div class="flex-grow-1 mx-3"
+                                    style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+                                    <div
+                                        :style="{ width: (count / stats.active_count * 100) + '%', background: tier === 'Pro+' ? 'var(--warning)' : 'var(--primary)', height: '100%', borderRadius: '4px' }">
+                                    </div>
                                 </div>
                                 <span class="fw-bold">{{ count }}</span>
                             </div>
@@ -310,7 +319,8 @@
                         <div class="panel">
                             <h5 class="mb-3">月別新規契約</h5>
                             <div class="growth-list">
-                                <div v-for="item in detailedStats.growth_data" :key="item.month" class="d-flex justify-content-between small mb-1">
+                                <div v-for="item in detailedStats.growth_data" :key="item.month"
+                                    class="d-flex justify-content-between small mb-1">
                                     <span>{{ item.month }}</span>
                                     <span class="text-success">+{{ item.count }}</span>
                                 </div>
@@ -360,6 +370,7 @@
                             <label class="form-label">プラン</label>
                             <div class="input-group">
                                 <select v-model="editModal.data.plan_tier" class="form-select">
+                                    <option value="Free">Free</option>
                                     <option value="Pro">Pro</option>
                                     <option value="Pro+">Pro+</option>
                                 </select>
@@ -368,10 +379,10 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">期間延長 (月)</label>
+                            <label class="form-label">期間調整 (月) <small class="text-muted">※短縮はマイナス入力</small></label>
                             <div class="input-group">
-                                <input type="number" v-model="editModal.extendDuration" class="form-control" min="1">
-                                <button class="btn btn-success" @click="saveEdit">延長実行</button>
+                                <input type="number" v-model="editModal.extendDuration" class="form-control">
+                                <button class="btn btn-success" @click="saveEdit">実行</button>
                             </div>
                         </div>
                     </div>
@@ -431,6 +442,45 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Modal -->
+        <div class="modal fade" id="addModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">ライセンス新規作成</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">サーバーID</label>
+                            <input type="text" v-model="addModal.data.server_id" class="form-control"
+                                placeholder="Discord Guild ID">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ユーザーID</label>
+                            <input type="text" v-model="addModal.data.user_id" class="form-control"
+                                placeholder="Discord User ID">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">プラン</label>
+                            <select v-model="addModal.data.tier" class="form-select">
+                                <option value="Free">Free</option>
+                                <option value="Pro">Pro</option>
+                                <option value="Pro+">Pro+</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">期間 (例: 1m, 1y, 30d)</label>
+                            <input type="text" v-model="addModal.data.duration" class="form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary w-100" @click="createSub">作成実行</button>
                     </div>
                 </div>
             </div>
