@@ -52,11 +52,16 @@ function parseApplication(content) {
 
     if (!userMatch || !serverMatch || !tierMatch) return null;
 
+    const rawTier = tierMatch[1].trim();
+    let tier = rawTier;
+    if (rawTier.toLowerCase() === 'pro') tier = 'Pro';
+    else if (rawTier.toLowerCase() === 'pro+') tier = 'Pro+';
+
     return {
         boothName: boothMatch ? boothMatch[1].trim() : 'Unknown',
         userId: userMatch[1].trim(),
         serverId: serverMatch[1].trim(),
-        tier: tierMatch[1].trim()
+        tier: tier
     };
 }
 

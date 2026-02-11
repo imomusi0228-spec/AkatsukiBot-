@@ -54,7 +54,11 @@ module.exports = async (interaction) => {
                     });
                 }
 
-                tier = row.plan_tier;
+                // Normalize tier casing
+                if (row.plan_tier.toLowerCase() === 'pro') tier = 'Pro';
+                else if (row.plan_tier.toLowerCase() === 'pro+') tier = 'Pro+';
+                else tier = row.plan_tier; // Fallback
+
                 durationMonths = row.duration_months;
                 usedKey = row.key_id;
             } else {
