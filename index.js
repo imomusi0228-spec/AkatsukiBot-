@@ -2,7 +2,7 @@ require('dotenv').config(); // Load env vars FIRST
 const { Client, GatewayIntentBits, Events, ActivityType } = require('discord.js');
 
 // Enviroment Variable Check
-const envVars = ['DATABASE_URL', 'DISCORD_TOKEN', 'CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'ADMIN_TOKEN', 'PUBLIC_URL'];
+const envVars = ['DATABASE_URL', 'DISCORD_TOKEN', 'CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'ADMIN_TOKEN', 'PUBLIC_URL', 'ANNOUNCEMENT_CHANNEL_ID'];
 envVars.forEach(key => {
     if (!process.env[key]) console.warn(`[Config] ${key} is missing!`);
 });
