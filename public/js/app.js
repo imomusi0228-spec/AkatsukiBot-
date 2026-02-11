@@ -92,11 +92,11 @@ createApp({
                 const data = await res.json();
                 if (data.authenticated) {
                     user.value = data.user;
-                    loadData();
+                    loadData(true);
                 } else if (localStorage.getItem('admin_token')) {
                     // Try token auth
                     isAdminLogged.value = true;
-                    loadData();
+                    loadData(true);
                 } else {
                     loading.value = false;
                 }
@@ -121,8 +121,8 @@ createApp({
             return res.json();
         };
 
-        const loadData = async () => {
-            loading.value = true;
+        const loadData = async (isInitial = false) => {
+            if (isInitial) loading.value = true;
             const [sData, aData, stData, lData, dsData] = await Promise.all([
                 api('/subscriptions'),
                 api('/applications'),
@@ -134,8 +134,8 @@ createApp({
             applications.value = aData || [];
             stats.value = stData || {};
             logs.value = lData || [];
-            detailedStats.value = dsData || { tier_distribution: {}, retention_rate: 0, growth_data: [] };
-            loading.value = false;
+            detailedStats.value = dsData || { tier_distribution: { paid: {}, trial: {}, overall: {} }, retention_rate: 0, growth_data: [] };
+            if (isInitial) loading.value = false;
         };
 
         const formatDate = (dateStr) => {
