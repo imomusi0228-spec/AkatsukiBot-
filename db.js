@@ -146,6 +146,21 @@ async function initDB() {
       );
     `);
 
+    // 4. Final Cleanup/Normalization
+    try {
+      // Ensure plan_tier is VARCHAR and convert numeric values
+      await client.query(`
+        ALTER TABLE subscriptions ALTER COLUMN plan_tier TYPE VARCHAR(50) USING plan_tier::VARCHAR;
+      `);
+
+      // Convert numeric tiers to string names
+      await client.query("UPDATE subscriptions SET plan_tier = 'Pro' WHERE plan_tier = '1'");
+      await client.query("UPDATE subscriptions SET plan_tier = 'Pro+' WHERE plan_tier = '3'");
+      console.log('[DB] Normalized numeric tiers to names and ensured VARCHAR type.');
+    } catch (e) {
+      console.error('[DB] Normalization Error:', e.message);
+    }
+
     console.log('Database tables initialized.');
   } catch (err) {
     console.error('Error initializing database:', err);
