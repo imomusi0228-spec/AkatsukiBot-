@@ -247,6 +247,41 @@ createApp({
             isAdminLogged.value = false;
         };
 
+        const showOverallPie = () => {
+            const modal = new bootstrap.Modal(document.getElementById('pieModal'));
+            modal.show();
+
+            // Wait for modal to be visible
+            setTimeout(() => {
+                const ctx = document.getElementById('overallPieChart').getContext('2d');
+                if (window.myPieChart) window.myPieChart.destroy();
+
+                const data = detailedStats.value.tier_distribution.overall;
+                window.myPieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(data),
+                        datasets: [{
+                            data: Object.values(data),
+                            backgroundColor: [
+                                '#7aa2f7', '#e0af68', '#bb9af7', '#9ece6a', '#f7768e', '#565f89', '#414868'
+                            ],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#c0caf5', padding: 20 }
+                            }
+                        }
+                    }
+                });
+            }, 300);
+        };
+
         return {
             user, isAdminLogged, loading, activeTab,
             stats, detailedStats, filteredSubscriptions, applications, logs,
@@ -255,7 +290,7 @@ createApp({
             formatDate, deactivateSub, toggleAutoRenew, copyText,
             openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
-            loadData
+            loadData, showOverallPie
         };
     }
 }).mount('#app');

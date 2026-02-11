@@ -117,23 +117,35 @@ router.get('/stats', authMiddleware, async (req, res) => {
 router.get('/stats/detailed', authMiddleware, async (req, res) => {
     try {
         const stats = {
-            tier_distribution: {},
+            tier_distribution: {
+                paid: {},
+                trial: {},
+                overall: {}
+            },
             retention_rate: 0,
             growth_data: []
         };
 
-        // Tier Distribution
-        const tierRes = await db.query('SELECT plan_tier, COUNT(*) FROM subscriptions WHERE is_active = TRUE GROUP BY plan_tier');
-        tierRes.rows.forEach(row => {
-            stats.tier_distribution[row.plan_tier] = parseInt(row.count);
+        // All active subscriptions for distribution
+        const activeRes = await db.query('SELECT plan_tier, COUNT(*) FROM subscriptions WHERE is_active = TRUE GROUP BY plan_tier');
+        activeRes.rows.forEach(row => {
+            const tier = row.plan_tier;
+            const count = parseInt(row.count);
+            stats.tier_distribution.overall[tier] = count;
+
+            if (tier === 'Pro' || tier === 'Pro+') {
+                stats.tier_distribution.paid[tier] = count;
+            } else if (tier.includes('Trial')) {
+                stats.tier_distribution.trial[tier] = count;
+            }
         });
 
-        // Retention Rate (Simplified: Active / Total ever)
-        const totalRes = await db.query('SELECT COUNT(*) FROM subscriptions');
-        const activeRes = await db.query('SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE');
-        const total = parseInt(totalRes.rows[0].count);
-        const active = parseInt(activeRes.rows[0].count);
-        stats.retention_rate = total > 0 ? Math.round((active / total) * 100) : 0;
+        // Retention Rate (Paid only: Active Pro/Pro+ / Total ever Pro/Pro+)
+        const totalPaidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE plan_tier IN ('Pro', 'Pro+')");
+        const activePaidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE AND plan_tier IN ('Pro', 'Pro+')");
+        const totalPaid = parseInt(totalPaidRes.rows[0].count);
+        const activePaid = parseInt(activePaidRes.rows[0].count);
+        stats.retention_rate = totalPaid > 0 ? Math.round((activePaid / totalPaid) * 100) : 0;
 
         // Growth Data (Last 6 months)
         const growthRes = await db.query(`
@@ -141,7 +153,8 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
                 TO_CHAR(COALESCE(start_date, created_at, NOW()), 'YYYY-MM') as month,
                 COUNT(*) as count
             FROM subscriptions 
-            WHERE COALESCE(start_date, created_at, NOW()) >= NOW() - INTERVAL '6 months'
+            WHERE plan_tier IN ('Pro', 'Pro+')
+            AND COALESCE(start_date, created_at, NOW()) >= NOW() - INTERVAL '6 months'
             GROUP BY month
             ORDER BY month ASC
         `);
