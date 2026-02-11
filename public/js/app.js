@@ -36,7 +36,8 @@ createApp({
                 expiry_date: null,
                 auto_renew: false
             },
-            extendDuration: 1
+            extendDuration: 1,
+            extendUnit: 'm'
         });
         const addModal = reactive({
             show: false,
@@ -169,7 +170,7 @@ createApp({
         const saveEdit = async () => {
             await api(`/subscriptions/${editModal.data.server_id}`, 'PUT', {
                 action: 'extend',
-                duration: editModal.extendDuration + 'm'
+                duration: editModal.extendDuration + editModal.extendUnit
             });
             bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
             loadData();

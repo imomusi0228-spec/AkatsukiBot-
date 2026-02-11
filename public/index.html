@@ -379,9 +379,13 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">期間調整 (月) <small class="text-muted">※短縮はマイナス入力</small></label>
+                            <label class="form-label">期間調整 <small class="text-muted">※短縮はマイナス入力</small></label>
                             <div class="input-group">
                                 <input type="number" v-model="editModal.extendDuration" class="form-control">
+                                <select v-model="editModal.extendUnit" class="form-select" style="max-width: 80px;">
+                                    <option value="m">月</option>
+                                    <option value="d">日</option>
+                                </select>
                                 <button class="btn btn-success" @click="saveEdit">実行</button>
                             </div>
                         </div>
