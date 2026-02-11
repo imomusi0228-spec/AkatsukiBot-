@@ -266,7 +266,8 @@
                                         <div v-else class="text-danger small mt-1">
                                             <svg width="12" height="12" fill="currentColor" class="me-1"
                                                 viewBox="0 0 16 16">
-                                                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                                                <path
+                                                    d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
                                             </svg>
                                             使用済み
                                         </div>
@@ -303,15 +304,15 @@
                         <div class="panel">
                             <h5 class="mb-3">Tier分布</h5>
                             <div v-for="(count, tier) in detailedStats.tier_distribution" :key="tier"
-                                class="d-flex justify-content-between align-items-center mb-2">
-                                <span>{{ tier }}</span>
+                                class="d-flex align-items-center mb-2">
+                                <span style="min-width: 50px;">{{ tier }}</span>
                                 <div class="flex-grow-1 mx-3"
                                     style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px;">
                                     <div
                                         :style="{ width: (count / stats.active_count * 100) + '%', background: tier === 'Pro+' ? 'var(--warning)' : 'var(--primary)', height: '100%', borderRadius: '4px' }">
                                     </div>
                                 </div>
-                                <span class="fw-bold">{{ count }}</span>
+                                <span class="fw-bold text-end" style="min-width: 25px;">{{ count }}</span>
                             </div>
                         </div>
                     </div>
