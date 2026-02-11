@@ -251,7 +251,7 @@ createApp({
             stats, detailedStats, filteredSubscriptions, applications, logs,
             searchQuery, filterStatus,
             editModal, addModal, keyModal, appDetailsModal,
-            formatDate, extendSub, deactivateSub, toggleAutoRenew, copyText,
+            formatDate, deactivateSub, toggleAutoRenew, copyText,
             openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData
