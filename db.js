@@ -108,10 +108,25 @@ async function initDB() {
         is_used BOOLEAN DEFAULT FALSE,
         used_by_user VARCHAR(255),
         used_at TIMESTAMP,
+        reserved_user_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         notes TEXT
       );
     `);
+
+    // Ensure reserved_user_id column exists
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='license_keys' AND column_name='reserved_user_id') THEN
+            ALTER TABLE license_keys ADD COLUMN reserved_user_id VARCHAR(255);
+          END IF;
+        END $$;
+      `);
+    } catch (err) {
+      console.warn('[DB] Migration failed (reserved_user_id):', err.message);
+    }
 
 
     console.log('Database tables initialized.');

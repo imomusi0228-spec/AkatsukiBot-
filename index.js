@@ -2,18 +2,9 @@ require('dotenv').config(); // Load env vars FIRST
 const { Client, GatewayIntentBits, Events, ActivityType } = require('discord.js');
 
 // Enviroment Variable Check
-const envVars = [
-    'DATABASE_URL',
-    'DISCORD_TOKEN',
-    'CLIENT_ID',
-    'DISCORD_CLIENT_SECRET',
-    'ADMIN_TOKEN',
-    'PUBLIC_URL'
-];
-console.log('>>> Environment Check:');
+const envVars = ['DATABASE_URL', 'DISCORD_TOKEN', 'CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'ADMIN_TOKEN', 'PUBLIC_URL'];
 envVars.forEach(key => {
-    const val = process.env[key];
-    console.log(`[Env] ${key}: ${val ? (key.includes('TOKEN') || key.includes('SECRET') || key.includes('URL') ? (val.length > 10 ? val.substring(0, 5) + '...' : '***') : val) : 'MISSING'}`);
+    if (!process.env[key]) console.warn(`[Config] ${key} is missing!`);
 });
 const db = require('./db');
 const { commands, handleInteraction } = require('./commands');
@@ -49,15 +40,12 @@ const setBotPresence = () => {
     }
 };
 
-// Event Handlers
 client.once(Events.ClientReady, async () => {
-    console.log(`>>> [Discord] Logged in as ${client.user.tag}!`);
+    console.log(`[Discord] Ready! Logged in as ${client.user.tag}`);
     setBotPresence();
 
-    // Start background tasks
     const runBackgroundTasks = async () => {
         try {
-            console.log('[Background] Running sync and expiry check...');
             await syncSubscriptions(client);
             await checkExpirations(client);
         } catch (err) {
@@ -66,8 +54,7 @@ client.once(Events.ClientReady, async () => {
     };
 
     runBackgroundTasks();
-    setInterval(runBackgroundTasks, 300000); // 5 mins
-    console.log('[Background] Periodic tasks scheduled (5m).');
+    setInterval(runBackgroundTasks, 300000);
 });
 
 client.on('interactionCreate', handleInteraction);
@@ -113,43 +100,15 @@ client.on(Events.GuildMemberAdd, async (member) => {
     }
 });
 
-// Main Startup Flow
 async function main() {
     try {
-        // 2. Start Web Server
         startServer(client);
-        console.log('[Web] Server started.');
-
-        // 3. Initialize Database
         await db.initDB();
-        console.log('[DB] Database initialized.');
 
-        // 4. Setup Keep-Alive (Render Support)
-        // 4. Setup Public URL Log
-        const PUBLIC_URL = process.env.PUBLIC_URL;
-        if (PUBLIC_URL) {
-            console.log(`[Config] Public URL configured: ${PUBLIC_URL}`);
-        } else {
-            console.warn('[Config] PUBLIC_URL is not set. OAuth redirects may fail.');
-        }
-
-        // 5. Login to Discord
-        if (!process.env.DISCORD_TOKEN) {
-            throw new Error('DISCORD_TOKEN is missing from environment variables!');
-        }
-        const token = process.env.DISCORD_TOKEN.trim();
-
-        // DEBUG: Token Validation Log
-        const tokenLength = token.length;
-        const tokenStart = token.substring(0, 5);
-        console.log(`[Debug] Token check: Length=${tokenLength}, StartsWith=${tokenStart}...`);
-
-        console.log('[Discord] Attempting login...');
-        await client.login(token);
-        console.log('[Discord] Login call completed (waiting for ClientReady).');
-
+        if (!process.env.DISCORD_TOKEN) throw new Error('DISCORD_TOKEN is missing!');
+        await client.login(process.env.DISCORD_TOKEN.trim());
     } catch (error) {
-        console.error('FATAL STARTUP ERROR:', error);
+        console.error('FATAL:', error);
         process.exit(1);
     }
 }

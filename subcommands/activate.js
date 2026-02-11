@@ -34,14 +34,22 @@ module.exports = async (interaction) => {
     let durationMonths = 0;
     let usedKey = null;
 
-    // --- 1. Key Verification (Priority) ---
+    // --- 1. Key Verification ---
     if (inputKey) {
         try {
-            // Check if the key exists and is not used
-            const keyCheck = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_used = FALSE', [inputKey.trim().toUpperCase()]);
+            const trimmedKey = inputKey.trim().toUpperCase();
+            const keyCheck = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_used = FALSE', [trimmedKey]);
 
             if (keyCheck.rows.length > 0) {
                 const row = keyCheck.rows[0];
+
+                // Restriction Check
+                if (row.reserved_user_id && row.reserved_user_id !== userId) {
+                    return interaction.editReply({
+                        content: '❌ **このライセンスキーは他のユーザー専用に発行されています。**\n申請した本人のアカウントで実行してください。'
+                    });
+                }
+
                 tier = row.plan_tier;
                 durationMonths = row.duration_months;
                 usedKey = row.key_id;
@@ -49,16 +57,14 @@ module.exports = async (interaction) => {
                 return interaction.editReply({ content: '❌ **無効なキーまたは注文番号です。**\n既に使用されているか、入力が間違っている可能性があります。' });
             }
         } catch (err) {
-            console.error('Error checking key:', err);
+            console.error('[Activate] Key check error:', err);
             return interaction.editReply({ content: 'エラーが発生しました（キー照合失敗）。' });
         }
     }
 
-    // --- 2. Verification Cleanup (Removed Role Fallback) ---
-
     if (!tier) {
         return interaction.editReply({
-            content: `❌ **有効なサブスクリプションが見つかりませんでした。**\n\n入力されたキーが正しいか確認してください。\nライセンスの適用には、管理者から発行されたキーが必須です。`
+            content: `❌ **有効なサブスクリプションが見つかりませんでした。**\n管理者から発行された正しいキーを入力してください。`
         });
     }
 

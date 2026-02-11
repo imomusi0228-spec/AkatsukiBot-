@@ -26,15 +26,16 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
 
         // 1. Generate a new License Key
         const tier = app.parsed_tier || 'Pro';
-        const duration = 1; // Default to 1 month for Pro, could be smarter if needed
+        const duration = 1;
         const randomBuffer = crypto.randomBytes(4);
         const key = `AK-${randomBuffer.toString('hex').toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+        const reservedUser = app.parsed_user_id || null;
 
         // 2. Insert into license_keys
         await db.query(`
-            INSERT INTO license_keys (key_id, plan_tier, duration_months, notes)
-            VALUES ($1, $2, $3, $4)
-        `, [key, tier, duration, `Generated for App ID: ${id} (${app.parsed_booth_name})`]);
+            INSERT INTO license_keys (key_id, plan_tier, duration_months, reserved_user_id, notes)
+            VALUES ($1, $2, $3, $4, $5)
+        `, [key, tier, duration, reservedUser, `Generated for App ID: ${id} (${app.parsed_booth_name})`]);
 
         // 3. Update application status and store the generated key
         await db.query('UPDATE applications SET status = \'approved\', license_key = $1 WHERE id = $2', [key, id]);
