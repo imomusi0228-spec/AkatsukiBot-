@@ -38,10 +38,14 @@ module.exports = async (interaction) => {
     if (inputKey) {
         try {
             const trimmedKey = inputKey.trim().toUpperCase();
-            const keyCheck = await db.query('SELECT * FROM license_keys WHERE key_id = $1 AND is_used = FALSE', [trimmedKey]);
+            const keyCheck = await db.query('SELECT * FROM license_keys WHERE key_id = $1', [trimmedKey]);
 
             if (keyCheck.rows.length > 0) {
                 const row = keyCheck.rows[0];
+
+                if (row.is_used) {
+                    return interaction.editReply({ content: '❌ **このライセンスキーは既に使用済みです。**\n一度使ったキーは再利用できません。' });
+                }
 
                 // Restriction Check
                 if (row.reserved_user_id && row.reserved_user_id !== userId) {
@@ -54,7 +58,7 @@ module.exports = async (interaction) => {
                 durationMonths = row.duration_months;
                 usedKey = row.key_id;
             } else {
-                return interaction.editReply({ content: '❌ **無効なキーまたは注文番号です。**\n既に使用されているか、入力が間違っている可能性があります。' });
+                return interaction.editReply({ content: '❌ **無効なキーまたは注文番号です。**\n入力が間違っている可能性があります。' });
             }
         } catch (err) {
             console.error('[Activate] Key check error:', err);
