@@ -120,7 +120,6 @@ async function syncSubscriptions(client) {
                                     `UPDATE subscriptions SET 
                                     tier = $1,
                                     is_active = TRUE,
-                                    expiry_date = NULL,
                                     cached_username = $2 
                                  WHERE guild_id = $3`,
                                     [tier, userName, sId]
