@@ -124,6 +124,19 @@ createApp({
             alert('設定を保存しました');
         };
 
+        const testWebhook = async () => {
+            try {
+                const res = await api('/settings/test-webhook', 'POST');
+                if (res.success) {
+                    alert('テスト送信をリクエストしました。Discordを確認してみてください。');
+                } else {
+                    alert('送信に失敗した可能性があります。');
+                }
+            } catch (e) {
+                alert('エラーが発生しました: ' + e.message);
+            }
+        };
+
         const toggleSelectAll = (e) => {
             if (e.target.checked) {
                 selectedSubs.value = subscriptions.value.map(s => s.guild_id);
@@ -436,7 +449,7 @@ createApp({
             openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData, changePage, search, showOverallPie,
-            announceModal, sendAnnouncement, loadLogs, updateSetting,
+            announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,
             toggleSelectAll, bulkDeactivate
         };
     }

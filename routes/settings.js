@@ -17,6 +17,8 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
+const { sendWebhookNotification } = require('../services/notificationService');
+
 // Update or set a setting
 router.post('/', authMiddleware, async (req, res) => {
     const { key, value } = req.body;
@@ -30,6 +32,24 @@ router.post('/', authMiddleware, async (req, res) => {
                 value = EXCLUDED.value,
                 updated_at = CURRENT_TIMESTAMP
         `, [key, value]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Test webhook
+router.post('/test-webhook', authMiddleware, async (req, res) => {
+    try {
+        await sendWebhookNotification({
+            title: 'Webhook Test',
+            description: '管理コンソールからのテスト送信だよ。これが見えていれば、設定はバッチリだ。',
+            color: 0x7aa2f7,
+            fields: [
+                { name: 'Status', value: 'Success ✅', inline: true },
+                { name: 'Timestamp', value: new Date().toLocaleString(), inline: true }
+            ]
+        });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
