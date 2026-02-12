@@ -6,7 +6,7 @@ const { authMiddleware } = require('./auth');
 // Get all settings
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM settings');
+        const result = await db.query('SELECT * FROM bot_system_settings');
         const settings = {};
         result.rows.forEach(row => {
             settings[row.key] = row.value;
@@ -26,7 +26,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     try {
         await db.query(`
-            INSERT INTO settings (key, value, updated_at)
+            INSERT INTO bot_system_settings (key, value, updated_at)
             VALUES ($1, $2, CURRENT_TIMESTAMP)
             ON CONFLICT (key) DO UPDATE SET
                 value = EXCLUDED.value,

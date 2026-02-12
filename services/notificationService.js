@@ -7,7 +7,7 @@ const db = require('../db');
  */
 async function sendWebhookNotification(payload) {
     try {
-        const result = await db.query("SELECT value FROM settings WHERE key = 'webhook_url'");
+        const result = await db.query("SELECT value FROM bot_system_settings WHERE key = 'webhook_url'");
         const webhookUrl = result.rows.length > 0 ? result.rows[0].value : null;
 
         if (!webhookUrl) {

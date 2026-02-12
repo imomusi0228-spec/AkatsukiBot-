@@ -212,7 +212,7 @@ async function initDB() {
     }
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS settings (
+      CREATE TABLE IF NOT EXISTS bot_system_settings (
         key VARCHAR(255) PRIMARY KEY,
         value TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
