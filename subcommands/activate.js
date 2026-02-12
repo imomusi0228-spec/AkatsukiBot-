@@ -32,6 +32,7 @@ module.exports = async (interaction) => {
 
     let tier = null;
     let durationMonths = 0;
+    let durationDays = 0;
     let usedKey = null;
 
     // --- 1. Key Verification ---
@@ -55,11 +56,17 @@ module.exports = async (interaction) => {
                 }
 
                 // Normalize tier casing
-                if (row.tier && row.tier.toLowerCase() === 'pro') tier = 'Pro';
-                else if (row.tier && row.tier.toLowerCase() === 'pro+') tier = 'Pro+';
+                const lowerTier = row.tier ? row.tier.toLowerCase() : '';
+                if (lowerTier === 'pro') tier = 'Pro';
+                else if (lowerTier === 'pro+') tier = 'Pro+';
+                else if (lowerTier === 'trial pro') tier = 'Trial Pro';
+                else if (lowerTier === 'trial pro+') tier = 'Trial Pro+';
                 else tier = row.tier; // Fallback
 
+
+
                 durationMonths = row.duration_months;
+                durationDays = row.duration_days; // New field
                 usedKey = row.key_id;
             } else {
                 return interaction.editReply({ content: '❌ **無効なキーまたは注文番号です。**\n入力が間違っている可能性があります。' });
@@ -86,8 +93,14 @@ module.exports = async (interaction) => {
         if (!isCurrentServerRegistered) {
             // Check limits for new server registration
             let maxLimit = 1;
-            const hasProPlus = (tier === 'Pro+') || (tier === '3') || (tier === 3) ||
-                existingSubs.some(s => (s.tier === 'Pro+') || (s.tier === '3') || (s.tier === 3));
+
+            const isProPlus = (t) => {
+                if (!t) return false;
+                const s = String(t).toLowerCase();
+                return s === 'pro+' || s === '3' || s === '4';
+            };
+
+            const hasProPlus = isProPlus(tier) || existingSubs.some(s => isProPlus(s.tier));
             if (hasProPlus) maxLimit = 3;
 
             if (existingSubs.length >= maxLimit) {
@@ -99,7 +112,11 @@ module.exports = async (interaction) => {
 
         // Calculate expiry
         const exp = new Date();
-        exp.setMonth(exp.getMonth() + durationMonths);
+        if (durationDays) {
+            exp.setDate(exp.getDate() + durationDays);
+        } else {
+            exp.setMonth(exp.getMonth() + durationMonths);
+        }
 
         await db.query(`
             INSERT INTO subscriptions (guild_id, user_id, tier, expiry_date, is_active)

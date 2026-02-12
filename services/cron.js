@@ -25,21 +25,47 @@ function startCron(client) {
                 return t || 'Free';
             };
 
-            // 1. Check for subscriptions expiring within 7 days (warning notification)
-            const res = await db.query("SELECT guild_id, user_id, tier, expiry_date, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW() + INTERVAL '7 days' AND expiry_warning_sent = FALSE AND tier NOT IN ('Free', '0')");
+            // 1. Check for warnings
+            // A. Standard Tiers (Pro/Pro+): 7 days warning
+            const standardRes = await db.query(`
+                SELECT guild_id, user_id, tier, expiry_date, auto_renew 
+                FROM subscriptions 
+                WHERE is_active = TRUE 
+                AND expiry_date <= NOW() + INTERVAL '7 days' 
+                AND expiry_warning_sent = FALSE 
+                AND tier NOT IN ('Free', '0')
+                AND tier NOT LIKE 'Trial%'
+            `);
 
-            for (const sub of res.rows) {
+            // B. Trial Tiers (Trial Pro/Pro+): 1 day warning
+            const trialRes = await db.query(`
+                SELECT guild_id, user_id, tier, expiry_date, auto_renew 
+                FROM subscriptions 
+                WHERE is_active = TRUE 
+                AND expiry_date <= NOW() + INTERVAL '1 day' 
+                AND expiry_warning_sent = FALSE 
+                AND tier LIKE 'Trial%'
+            `);
+
+            const warningTargets = [...standardRes.rows, ...trialRes.rows];
+
+            for (const sub of warningTargets) {
                 const guildId = sub.guild_id;
                 const tierName = getTierName(sub.tier);
+                const isTrial = String(sub.tier).startsWith('Trial');
 
                 try {
                     const guild = await client.guilds.fetch(guildId).catch(() => null);
                     const user = await client.users.fetch(sub.user_id).catch(() => null);
 
                     if (user) {
+                        const description = isTrial
+                            ? `ご利用ありがとうございます。お使いの **${tierName}プラン** の有効期限がまもなく終了します。\n継続してご利用いただくには、BOOTHにて有料版の購入をご検討ください。`
+                            : `ご利用ありがとうございます。お使いの **${tierName}プラン** の有効期限がまもなく終了します。`;
+
                         const embed = new EmbedBuilder()
                             .setTitle('📅 サブスクリプション期限のお知らせ')
-                            .setDescription(`ご利用ありがとうございます。お使いの **${tierName}プラン** の有効期限がまもなく終了します。`)
+                            .setDescription(description)
                             .addFields(
                                 { name: 'サーバー', value: guild ? guild.name : `ID: ${guildId}` },
                                 { name: '期限', value: new Date(sub.expiry_date).toLocaleDateString() },
@@ -58,7 +84,7 @@ function startCron(client) {
 
                         await user.send({ embeds: [embed], components: [row] }).catch(() => null);
                         await db.query('UPDATE subscriptions SET expiry_warning_sent = TRUE WHERE guild_id = $1', [guildId]);
-                        console.log(`[Cron] Warning sent to user ${user.tag} for guild ${guildId}`);
+                        console.log(`[Cron] Warning sent to user ${user.tag} for guild ${guildId} (Trial: ${isTrial})`);
                     }
                 } catch (err) {
                     console.error(`[Cron] Failed to process warning for guild ${guildId}:`, err.message);

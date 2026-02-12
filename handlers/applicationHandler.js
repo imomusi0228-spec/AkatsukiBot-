@@ -48,7 +48,7 @@ function parseApplication(content) {
     const boothMatch = content.match(/購入者名[(（]BOOTH[)）][:：]\s*(.+)/);
     const userMatch = content.match(/ユーザーID[:：]\s*(\d+)/);
     const serverMatch = content.match(/サーバーID[:：]\s*(\d+)/);
-    const tierMatch = content.match(/希望プラン[(（]Pro\s*[\/\s]*Pro\+[)）][:：]\s*(Pro\+?)/i);
+    const tierMatch = content.match(/希望プラン[(（]Pro\s*[\/\s]*Pro\+[)）][:：]\s*((?:Trial\s+)?Pro\+?)/i);
 
     if (!userMatch || !serverMatch || !tierMatch) return null;
 
@@ -56,6 +56,8 @@ function parseApplication(content) {
     let tier = rawTier;
     if (rawTier.toLowerCase() === 'pro') tier = 'Pro';
     else if (rawTier.toLowerCase() === 'pro+') tier = 'Pro+';
+    else if (rawTier.toLowerCase() === 'trial pro') tier = 'Trial Pro';
+    else if (rawTier.toLowerCase() === 'trial pro+') tier = 'Trial Pro+';
 
     return {
         boothName: boothMatch ? boothMatch[1].trim() : 'Unknown',
@@ -65,4 +67,53 @@ function parseApplication(content) {
     };
 }
 
-module.exports = { handleApplicationMessage };
+async function handleApplicationModal(interaction) {
+    const boothName = interaction.fields.getTextInputValue('booth_name');
+    const userId = interaction.fields.getTextInputValue('user_id');
+    const guildId = interaction.fields.getTextInputValue('guild_id');
+    const rawTier = interaction.fields.getTextInputValue('tier_choice');
+
+    // Basic normalization
+    let tier = rawTier.trim();
+    if (tier.toLowerCase() === 'pro') tier = 'Pro';
+    else if (tier.toLowerCase() === 'pro+') tier = 'Pro+';
+    else if (tier.toLowerCase() === 'trial pro') tier = 'Trial Pro';
+    else if (tier.toLowerCase() === 'trial pro+') tier = 'Trial Pro+';
+
+    try {
+        await db.query(`
+            INSERT INTO applications (
+                message_id, channel_id, author_id, author_name, content,
+                parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+            `modal-${interaction.id}`,
+            interaction.channel.id,
+            interaction.user.id,
+            interaction.user.tag,
+            `Modal Submission: ${boothName} / ${tier}`,
+            userId,
+            guildId,
+            tier,
+            boothName,
+            'pending'
+        ]);
+
+        await interaction.reply({
+            content: '✅ **申請を受け付けました！**\n管理者が確認次第、ライセンスを発行いたします。少々お待ちください。',
+            ephemeral: true
+        });
+
+        // Log to console
+        console.log(`[App] New modal application from ${interaction.user.tag} for ${tier}`);
+
+    } catch (err) {
+        console.error('[App] Modal Save Error:', err);
+        await interaction.reply({
+            content: '❌ 申請の保存中にエラーが発生しました。時間を置いて再度お試しください。',
+            ephemeral: true
+        });
+    }
+}
+
+module.exports = { handleApplicationMessage, handleApplicationModal };

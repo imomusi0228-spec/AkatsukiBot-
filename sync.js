@@ -116,7 +116,8 @@ async function syncSubscriptions(client) {
                                 await db.query(
                                     `UPDATE subscriptions SET 
                                     tier = $1,
-                                    is_active = TRUE 
+                                    is_active = TRUE,
+                                    expiry_date = NULL 
                                  WHERE guild_id = $2`,
                                     [tier, sId]
                                 ).catch((err) => {

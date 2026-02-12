@@ -12,7 +12,7 @@ async function inspect() {
         const res = await client.query(`
       SELECT column_name
       FROM information_schema.columns 
-      WHERE table_name = 'subscriptions'
+      WHERE table_name = 'license_keys'
     `);
         console.log('--- COLUMNS START ---');
         res.rows.forEach(r => console.log(r.column_name));
