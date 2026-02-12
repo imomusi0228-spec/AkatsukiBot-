@@ -1,4 +1,4 @@
-const { createApp, ref, computed, onMounted, reactive } = Vue;
+const { createApp, ref, computed, onMounted, reactive, watch } = Vue;
 
 createApp({
     setup() {
@@ -18,7 +18,11 @@ createApp({
         const applications = ref([]);
         const subPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
         const appPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
-        const logs = ref([]);
+        const auditLogs = ref([]);
+        const logPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
+        const logFilter = reactive({ search: '', action: '' });
+        const settings = ref({ webhook_url: '' });
+        const selectedSubs = ref([]);
         const detailedStats = ref({
             tier_distribution: { paid: {}, trial: {}, overall: {} },
             retention_rate: 0,
@@ -83,11 +87,11 @@ createApp({
             // but for full scalability, we'd add &status= filter to API.
             // For now, let's just use the search param.
 
-            const [sRes, aRes, stData, lData, dsData] = await Promise.all([
+            const [sRes, aRes, stData, setsRes, dsData] = await Promise.all([
                 api(`/subscriptions${subQuery}`),
                 api(`/applications?page=${appPagination.value.page}&limit=${appPagination.value.limit}`),
                 api('/subscriptions/stats'),
-                api('/subscriptions/logs'),
+                api('/settings'),
                 api('/subscriptions/stats/detailed')
             ]);
 
@@ -98,10 +102,53 @@ createApp({
             appPagination.value = aRes.pagination || appPagination.value;
 
             stats.value = stData || {};
-            logs.value = lData || [];
+            settings.value = setsRes || { webhook_url: '' };
             detailedStats.value = dsData || { tier_distribution: { paid: {}, trial: {}, overall: {} }, retention_rate: 0, growth_data: [] };
 
             if (isInitial) loading.value = false;
+        };
+
+        const loadLogs = async (page = 1) => {
+            logPagination.value.page = page;
+            let query = `?page=${page}&limit=${logPagination.value.limit}`;
+            if (logFilter.search) query += `&search=${encodeURIComponent(logFilter.search)}`;
+            if (logFilter.action) query += `&action_type=${logFilter.action}`;
+
+            const res = await api(`/logs${query}`);
+            auditLogs.value = res.logs || [];
+            logPagination.value = res.pagination || logPagination.value;
+        };
+
+        const updateSetting = async (key, value) => {
+            await api('/settings', 'POST', { key, value });
+            alert('設定を保存しました');
+        };
+
+        const toggleSelectAll = (e) => {
+            if (e.target.checked) {
+                selectedSubs.value = subscriptions.value.map(s => s.guild_id);
+            } else {
+                selectedSubs.value = [];
+            }
+        };
+
+        const bulkDeactivate = async () => {
+            if (!confirm(`${selectedSubs.value.length}件のライセンスを一括停止しますか？`)) return;
+            loading.value = true;
+            try {
+                // For simplicity, we process them one by one or in a loop
+                // In a production app, we'd have a specific /bulk endpoint
+                for (const gId of selectedSubs.value) {
+                    await api(`/subscriptions/${gId}`, 'DELETE');
+                }
+                alert('一括停止が完了しました');
+                selectedSubs.value = [];
+                loadData();
+            } catch (e) {
+                alert('一括処理中にエラーが発生しました');
+            } finally {
+                loading.value = false;
+            }
         };
 
         const changePage = (type, page) => {
@@ -258,6 +305,45 @@ createApp({
             }
         };
 
+        watch(activeTab, (newTab) => {
+            if (newTab === 'stats') {
+                setTimeout(initGrowthChart, 300);
+            }
+        });
+
+        const initGrowthChart = () => {
+            const ctx = document.getElementById('growthChart')?.getContext('2d');
+            if (!ctx) return;
+            if (window.myGrowthChart) window.myGrowthChart.destroy();
+
+            const data = detailedStats.value.growth_data;
+            window.myGrowthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(i => i.month),
+                    datasets: [{
+                        label: '新規契約数',
+                        data: data.map(i => i.count),
+                        borderColor: '#7aa2f7',
+                        backgroundColor: 'rgba(122, 162, 247, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        };
+
         onMounted(() => {
             checkAuth();
             window.addEventListener('keydown', handleKeydown);
@@ -342,15 +428,16 @@ createApp({
 
         return {
             user, isAdminLogged, loading, activeTab,
-            stats, detailedStats, filteredSubscriptions, subscriptions, applications, logs,
-            subPagination, appPagination,
-            searchQuery, filterStatus,
+            stats, detailedStats, filteredSubscriptions, subscriptions, applications, auditLogs,
+            subPagination, appPagination, logPagination, logFilter,
+            searchQuery, filterStatus, settings, selectedSubs,
             editModal, addModal, keyModal, appDetailsModal,
             formatDate, deactivateSub, resumeSub, hardDeleteSub, toggleAutoRenew, copyText,
             openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData, changePage, search, showOverallPie,
-            announceModal, sendAnnouncement
+            announceModal, sendAnnouncement, loadLogs, updateSetting,
+            toggleSelectAll, bulkDeactivate
         };
     }
 }).mount('#app');

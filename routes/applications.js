@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { authMiddleware } = require('./auth');
 const crypto = require('crypto');
+const { sendWebhookNotification } = require('../services/notificationService');
 
 // Get all applications with pagination
 router.get('/', authMiddleware, async (req, res) => {
@@ -112,6 +113,23 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
         // 3. Update application status and store the generated key
         await db.query('UPDATE applications SET status = \'approved\', license_key = $1 WHERE id = $2', [key, id]);
 
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata)
+            VALUES ($1, $2, $3, $4, 'APPROVE_APP', $5, $6)
+        `, [operatorId, operatorName, id, targetDesc, `Approved application for ${tier}`, JSON.stringify({ tier, key, author_id: app.author_id })]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'Application Approved',
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n**Tier:** ${tier}\n**Generated Key:** \`${key}\``,
+            color: 0x2ecc71,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
+
         res.json({ success: true, key: key, tier: tier });
     } catch (err) {
         console.error(err);
@@ -123,7 +141,29 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
 router.post('/:id/reject', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
+        const appRes = await db.query('SELECT author_name, author_id, parsed_booth_name FROM applications WHERE id = $1', [id]);
+        if (appRes.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        const app = appRes.rows[0];
+
         await db.query('UPDATE applications SET status = \'rejected\' WHERE id = $1', [id]);
+
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details)
+            VALUES ($1, $2, $3, $4, 'REJECT_APP', 'Rejected application')
+        `, [operatorId, operatorName, id, targetDesc]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'Application Rejected',
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}`,
+            color: 0xe74c3c,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
+
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -135,7 +175,29 @@ router.post('/:id/reject', authMiddleware, async (req, res) => {
 router.post('/:id/cancel', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
+        const appRes = await db.query('SELECT author_name, author_id, parsed_booth_name FROM applications WHERE id = $1', [id]);
+        if (appRes.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        const app = appRes.rows[0];
+
         await db.query('UPDATE applications SET status = \'cancelled\' WHERE id = $1', [id]);
+
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details)
+            VALUES ($1, $2, $3, $4, 'CANCEL_APP', 'Cancelled approved application')
+        `, [operatorId, operatorName, id, targetDesc]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'Application Cancelled',
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}`,
+            color: 0x95a5a6,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
+
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -147,7 +209,21 @@ router.post('/:id/cancel', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
+        const appRes = await db.query('SELECT author_name, author_id, parsed_booth_name FROM applications WHERE id = $1', [id]);
+        if (appRes.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        const app = appRes.rows[0];
+
         await db.query('DELETE FROM applications WHERE id = $1', [id]);
+
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details)
+            VALUES ($1, $2, $3, $4, 'DELETE_APP', 'Deleted application record')
+        `, [operatorId, operatorName, id, targetDesc]);
+
         res.json({ success: true });
     } catch (err) {
         console.error(err);

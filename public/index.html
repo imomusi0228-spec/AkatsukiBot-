@@ -116,7 +116,11 @@
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" :class="{ active: activeTab === 'logs' }"
-                            @click="activeTab = 'logs'">操作ログ</button>
+                            @click="activeTab = 'logs'; loadLogs(1)">監査ログ</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeTab === 'settings' }"
+                            @click="activeTab = 'settings'">設定</button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" :class="{ active: activeTab === 'announce' }"
@@ -126,6 +130,12 @@
                 </ul>
 
                 <div v-if="activeTab === 'dashboard'" class="d-flex gap-2">
+                    <div v-if="selectedSubs.length > 0" class="me-3 d-flex align-items-center">
+                        <span class="badge bg-primary me-2">{{ selectedSubs.length }}件選択中</span>
+                        <button class="btn btn-sm btn-outline-danger me-1" @click="bulkDeactivate">一括停止</button>
+                        <button class="btn btn-sm btn-outline-secondary" @click="selectedSubs = []">解除</button>
+                    </div>
+
                     <div class="input-group input-group-sm" style="width: 300px;">
                         <input type="text" id="searchInput" class="form-control" v-model="searchQuery"
                             placeholder="検索 (Enterで検索, Ctrl+K)" @keyup.enter="search">
@@ -150,6 +160,7 @@
                     <table class="table table-dark table-hover mb-0">
                         <thead>
                             <tr>
+                                <th style="width: 40px;"><input type="checkbox" @change="toggleSelectAll($event)"></th>
                                 <th>有効</th>
                                 <th>サーバー</th>
                                 <th>ユーザー</th>
@@ -161,6 +172,7 @@
                         </thead>
                         <tbody>
                             <tr v-for="sub in filteredSubscriptions" :key="sub.guild_id">
+                                <td><input type="checkbox" :value="sub.guild_id" v-model="selectedSubs"></td>
                                 <td>
                                     <span class="badge" :class="sub.is_active ? 'bg-success' : 'bg-danger'">
                                         {{ sub.is_active ? 'ACTIVE' : 'INACTIVE' }}
@@ -421,15 +433,9 @@
                     <!-- Growth Chart -->
                     <div class="col-12 mt-4">
                         <div class="panel">
-                            <h5 class="mb-4">月別新規契約 (有料プランのみ)</h5>
-                            <div class="d-flex align-items-end" style="height: 150px;">
-                                <div v-for="item in detailedStats.growth_data" :key="item.month"
-                                    class="flex-grow-1 text-center d-flex flex-column align-items-center h-100 justify-content-end">
-                                    <div class="text-accent small mb-1">+{{ item.count }}</div>
-                                    <div :style="{ height: (item.count * 20) + 'px', width: '40px' }"
-                                        class="bg-primary rounded-top opacity-75"></div>
-                                    <div class="text-muted small mt-2">{{ item.month }}</div>
-                                </div>
+                            <h5 class="mb-4">月別新規契約推移 (有料プランのみ)</h5>
+                            <div style="height: 300px;">
+                                <canvas id="growthChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -451,29 +457,109 @@
                 </div>
             </div>
 
-            <!-- Tab Content: Logs -->
+            <!-- Tab Content: Audit Logs -->
             <div v-if="activeTab === 'logs'" class="px-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" v-model="logFilter.action" @change="loadLogs(1)">
+                            <option value="">すべてのアクション</option>
+                            <option value="CREATE">CREATE</option>
+                            <option value="EXTEND">EXTEND</option>
+                            <option value="UPDATE_TIER">UPDATE_TIER</option>
+                            <option value="TOGGLE_ACTIVE">TOGGLE_ACTIVE</option>
+                            <option value="DEACTIVATE">DEACTIVATE</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="APPROVE_APP">APPROVE_APP</option>
+                            <option value="REJECT_APP">REJECT_APP</option>
+                            <option value="CANCEL_APP">CANCEL_APP</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control form-control-sm" placeholder="ID/名前で検索..."
+                            v-model="logFilter.search" @keyup.enter="loadLogs(1)">
+                    </div>
+                </div>
+
                 <div class="panel p-0 overflow-hidden">
-                    <table class="table table-dark table-sm mb-0">
+                    <table class="table table-dark table-hover table-sm mb-0">
                         <thead>
                             <tr>
-                                <th>Time</th>
-                                <th>Operator</th>
-                                <th>Action</th>
-                                <th>Target</th>
-                                <th>Details</th>
+                                <th class="ps-3">日時</th>
+                                <th>操作者</th>
+                                <th>アクション</th>
+                                <th>対象</th>
+                                <th>内容</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="log in logs" :key="log.id">
-                                <td><small>{{ new Date(log.created_at).toLocaleString() }}</small></td>
-                                <td>{{ log.operator_name }}</td>
-                                <td><span class="badge bg-secondary">{{ log.action_type }}</span></td>
-                                <td><code class="small">{{ log.target_id }}</code></td>
-                                <td>{{ log.details }}</td>
+                            <tr v-for="log in auditLogs" :key="log.id">
+                                <td class="ps-3 text-nowrap"><small>{{ new Date(log.created_at).toLocaleString('ja-JP')
+                                        }}</small></td>
+                                <td>
+                                    <span class="badge bg-secondary opacity-75">{{ log.operator_name }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge" :class="{
+                                        'bg-success': ['CREATE', 'APPROVE_APP', 'EXTEND'].includes(log.action_type),
+                                        'bg-warning': ['UPDATE_TIER', 'TOGGLE_ACTIVE', 'TOGGLE_AUTO_RENEW'].includes(log.action_type),
+                                        'bg-danger': ['DELETE', 'DEACTIVATE', 'REJECT_APP'].includes(log.action_type),
+                                        'bg-secondary': !['CREATE', 'APPROVE_APP', 'EXTEND', 'UPDATE_TIER', 'TOGGLE_ACTIVE', 'TOGGLE_AUTO_RENEW', 'DELETE', 'DEACTIVATE', 'REJECT_APP'].includes(log.action_type)
+                                    }">{{ log.action_type }}</span>
+                                </td>
+                                <td>
+                                    <div class="small fw-bold">{{ log.target_name || 'System' }}</div>
+                                    <code class="extra-small text-muted">{{ log.target_id }}</code>
+                                </td>
+                                <td><small>{{ log.details }}</small></td>
+                            </tr>
+                            <tr v-if="auditLogs.length === 0">
+                                <td colspan="5" class="text-center py-4 text-muted">ログが見つかりません</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Log Pagination -->
+                <nav v-if="logPagination.pages > 1" class="mt-3">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        <li class="page-item" :class="{ disabled: logPagination.page === 1 }">
+                            <button class="page-link" @click="loadLogs(logPagination.page - 1)">前へ</button>
+                        </li>
+                        <li v-for="p in logPagination.pages" :key="p" class="page-item"
+                            :class="{ active: logPagination.page === p }">
+                            <button class="page-link" @click="loadLogs(p)">{{ p }}</button>
+                        </li>
+                        <li class="page-item" :class="{ disabled: logPagination.page === logPagination.pages }">
+                            <button class="page-link" @click="loadLogs(logPagination.page + 1)">次へ</button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Tab Content: Settings -->
+            <div v-if="activeTab === 'settings'" class="px-3">
+                <div class="panel p-4" style="max-width: 800px; margin: 0 auto;">
+                    <h4 class="mb-4">システム設定</h4>
+
+                    <div class="mb-5">
+                        <h6 class="text-accent mb-3"><i class="bi bi-discord me-2"></i>Discord Webhook 通知</h6>
+                        <p class="text-muted small">操作が行われた際に通知を送信するチャンネルのWebhook URLを入力してください。</p>
+                        <div class="input-group">
+                            <input type="password" class="form-control" v-model="settings.webhook_url"
+                                placeholder="https://discord.com/api/webhooks/...">
+                            <button class="btn btn-primary"
+                                @click="updateSetting('webhook_url', settings.webhook_url)">保存</button>
+                        </div>
+                        <div class="form-text mt-2 text-muted">※保存すると、今後すべての管理操作が指定したチャンネルに通知されます。</div>
+                    </div>
+
+                    <div class="alert alert-info border-0 rounded-4 p-4 d-flex align-items-center">
+                        <div class="display-6 me-4"><i class="bi bi-rocket-takeoff"></i></div>
+                        <div>
+                            <h6 class="alert-heading mb-1">Coming Soon...</h6>
+                            <p class="mb-0 small">自動承認ルールのカスタマイズや、外部サービスとの連携設定もここに追加される予定だよ。お楽しみに！</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

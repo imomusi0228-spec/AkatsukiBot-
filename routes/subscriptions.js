@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { updateMemberRoles } = require('../sync');
 const { authMiddleware } = require('./auth');
+const { sendWebhookNotification } = require('../services/notificationService');
 
 // GET /api/subscriptions
 router.get('/', authMiddleware, async (req, res) => {
@@ -211,11 +212,23 @@ router.patch('/:id/auto-renew', authMiddleware, async (req, res) => {
     try {
         await db.query('UPDATE subscriptions SET auto_renew = $1 WHERE guild_id = $2', [enabled, id]);
 
+        // Fetch sub info for logging/notification
+        const subRes = await db.query('SELECT cached_servername FROM subscriptions WHERE guild_id = $1', [id]);
+        const serverName = (subRes.rows[0]?.cached_servername) || id;
+
         // Log
         const operatorId = req.user?.userId || 'Unknown';
         const operatorName = req.user?.username || 'Unknown';
-        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'TOGGLE_AUTO_RENEW', $4)`,
-            [operatorId, operatorName, id, `Set auto_renew to ${enabled}`]);
+        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata) VALUES ($1, $2, $3, $4, 'TOGGLE_AUTO_RENEW', $5, $6)`,
+            [operatorId, operatorName, id, serverName, `Set auto_renew to ${enabled}`, JSON.stringify({ enabled })]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'Auto-Renew Toggled',
+            description: `**Server:** ${serverName} (\`${id}\`)\n**Status:** ${enabled ? 'Enabled' : 'Disabled'}`,
+            color: enabled ? 0x2ecc71 : 0xe74c3c,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
 
         res.json({ success: true });
     } catch (err) {
@@ -273,12 +286,32 @@ router.post('/', authMiddleware, async (req, res) => {
             [guild_id, user_id, tier, expiryDate]
         );
 
+        // Fetch server name if possible for logging
+        let serverName = guild_id;
+        const client = req.app.discordClient;
+        if (client) {
+            const guild = client.guilds.cache.get(guild_id) || await client.guilds.fetch(guild_id).catch(() => null);
+            if (guild) serverName = guild.name;
+        }
+
         // Log
-        const operator = req.user ? `${req.user.username} (${req.user.userId})` : 'Unknown';
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
         await db.query(`
-            INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details)
-            VALUES ($1, $2, $3, 'CREATE', $4)
-        `, [req.user?.userId || 'Unknown', req.user?.username || 'Unknown', guild_id, `Created ${tier} for ${duration}`]);
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata)
+            VALUES ($1, $2, $3, $4, 'CREATE', $5, $6)
+        `, [operatorId, operatorName, guild_id, serverName, `Created ${tier} for ${duration || 'unspecified'}`, JSON.stringify({ tier, duration, expiryDate })]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'License Created/Updated',
+            description: `**Server:** ${serverName} (\`${guild_id}\`)\n**Tier:** ${tier}\n**Duration:** ${duration || 'unspecified'}`,
+            color: 0x3498db,
+            fields: [
+                { name: 'User ID', value: user_id, inline: true },
+                { name: 'Operator', value: operatorName, inline: true }
+            ]
+        });
 
         res.json({ success: true });
     } catch (err) {
@@ -298,10 +331,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
         const operatorName = req.user?.username || 'Unknown';
 
         if (action === 'extend') {
-            const currentSub = await db.query('SELECT user_id, expiry_date, tier FROM subscriptions WHERE guild_id = $1', [id]);
+            const currentSub = await db.query('SELECT user_id, expiry_date, tier, cached_servername FROM subscriptions WHERE guild_id = $1', [id]);
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
             const subData = currentSub.rows[0];
+            const serverName = subData.cached_servername || id;
             let currentExpiry = subData.expiry_date ? new Date(subData.expiry_date) : new Date();
             if (currentExpiry < new Date()) currentExpiry = new Date();
 
@@ -325,8 +359,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
             await db.query('UPDATE subscriptions SET expiry_date = $1, is_active = TRUE, expiry_warning_sent = FALSE WHERE guild_id = $2', [currentExpiry, id]);
 
             // Log
-            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'EXTEND', $4)`,
-                [operatorId, operatorName, id, `Extended by ${duration}`]);
+            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata) VALUES ($1, $2, $3, $4, 'EXTEND', $5, $6)`,
+                [operatorId, operatorName, id, serverName, `Extended by ${duration}`, JSON.stringify({ duration, newExpiry: currentExpiry })]);
+
+            // Notify
+            await sendWebhookNotification({
+                title: 'License Extended',
+                description: `**Server:** ${serverName} (\`${id}\`)\n**Extension:** ${duration}\n**New Expiry:** ${currentExpiry.toLocaleDateString()}`,
+                color: 0x2ecc71,
+                fields: [{ name: 'Operator', value: operatorName, inline: true }]
+            });
 
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
@@ -334,25 +376,48 @@ router.put('/:id', authMiddleware, async (req, res) => {
             }
 
         } else if (action === 'update_tier') {
-            const currentSub = await db.query('SELECT user_id FROM subscriptions WHERE guild_id = $1', [id]);
+            const currentSub = await db.query('SELECT user_id, cached_servername, tier FROM subscriptions WHERE guild_id = $1', [id]);
             if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+
+            const subData = currentSub.rows[0];
+            const serverName = subData.cached_servername || id;
+            const oldTier = subData.tier;
 
             await db.query('UPDATE subscriptions SET tier = $1 WHERE guild_id = $2', [tier, id]);
 
             // Log
-            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'UPDATE_TIER', $4)`,
-                [operatorId, operatorName, id, `Changed to ${tier}`]);
+            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata) VALUES ($1, $2, $3, $4, 'UPDATE_TIER', $5, $6)`,
+                [operatorId, operatorName, id, serverName, `Changed to ${tier}`, JSON.stringify({ oldTier, newTier: tier })]);
+
+            // Notify
+            await sendWebhookNotification({
+                title: 'Tier Updated',
+                description: `**Server:** ${serverName} (\`${id}\`)\n**Old Tier:** ${oldTier}\n**New Tier:** ${tier}`,
+                color: 0xf1c40f,
+                fields: [{ name: 'Operator', value: operatorName, inline: true }]
+            });
 
             if (client && SUPPORT_GUILD_ID) {
                 const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(() => null);
-                if (guild) await updateMemberRoles(guild, currentSub.rows[0].user_id, tier);
+                if (guild) await updateMemberRoles(guild, subData.user_id, tier);
             }
         } else if (action === 'toggle_active') {
+            const currentSub = await db.query('SELECT cached_servername FROM subscriptions WHERE guild_id = $1', [id]);
+            const serverName = currentSub.rows[0]?.cached_servername || id;
+
             await db.query('UPDATE subscriptions SET is_active = $1 WHERE guild_id = $2', [is_active, id]);
 
             // Log
-            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'TOGGLE_ACTIVE', $4)`,
-                [operatorId, operatorName, id, `Set active to ${is_active}`]);
+            await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata) VALUES ($1, $2, $3, $4, 'TOGGLE_ACTIVE', $5, $6)`,
+                [operatorId, operatorName, id, serverName, `Set active to ${is_active}`, JSON.stringify({ is_active })]);
+
+            // Notify
+            await sendWebhookNotification({
+                title: is_active ? 'License Resumed' : 'License Suspended',
+                description: `**Server:** ${serverName} (\`${id}\`)`,
+                color: is_active ? 0x2ecc71 : 0xe67e22,
+                fields: [{ name: 'Operator', value: operatorName, inline: true }]
+            });
         }
 
         res.json({ success: true });
@@ -365,13 +430,24 @@ router.put('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
-        await db.query('UPDATE subscriptions SET is_active = FALSE WHERE guild_id = $1', [id]);
+        const subRes = await db.query('SELECT cached_servername FROM subscriptions WHERE guild_id = $1', [id]);
+        const serverName = subRes.rows[0]?.cached_servername || id;
+
+        await db.query('UPDATE subscriptions SET is_active = FALSE WHERE guild_id = $2', [id]);
 
         // Log
         const operatorId = req.user?.userId || 'Unknown';
         const operatorName = req.user?.username || 'Unknown';
-        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'DEACTIVATE', 'Soft Delete')`,
-            [operatorId, operatorName, id]);
+        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details) VALUES ($1, $2, $3, $4, 'DEACTIVATE', 'Soft Delete')`,
+            [operatorId, operatorName, id, serverName]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'License Deactivated',
+            description: `**Server:** ${serverName} (\`${id}\`)\n*License suspended via soft delete.*`,
+            color: 0xe74c3c,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
 
         res.json({ success: true });
     } catch (err) {
@@ -383,13 +459,24 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id/delete', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
+        const subRes = await db.query('SELECT cached_servername FROM subscriptions WHERE guild_id = $1', [id]);
+        const serverName = subRes.rows[0]?.cached_servername || id;
+
         await db.query('DELETE FROM subscriptions WHERE guild_id = $1', [id]);
 
         // Log
         const operatorId = req.user?.userId || 'Unknown';
         const operatorName = req.user?.username || 'Unknown';
-        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'DELETE', 'Hard Delete')`,
-            [operatorId, operatorName, id]);
+        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details) VALUES ($1, $2, $3, $4, 'DELETE', 'Hard Delete')`,
+            [operatorId, operatorName, id, serverName]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'License Permanently Deleted',
+            description: `**Server:** ${serverName} (\`${id}\`)\n*Data removed from database.*`,
+            color: 0x2c3e50,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
 
         res.json({ success: true });
     } catch (err) {

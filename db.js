@@ -186,9 +186,36 @@ async function initDB() {
         operator_id VARCHAR(255) NOT NULL,
         operator_name VARCHAR(255),
         target_id VARCHAR(255),
+        target_name VARCHAR(255),
         action_type VARCHAR(50) NOT NULL,
         details TEXT,
+        metadata JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Ensure columns exist for older operation_logs table
+    const logCols = ['target_name', 'metadata'];
+    for (const col of logCols) {
+      try {
+        await client.query(`
+          DO $$ 
+          BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='operation_logs' AND column_name='${col}') THEN
+              ALTER TABLE operation_logs ADD COLUMN ${col} ${col === 'metadata' ? 'JSONB' : 'VARCHAR(255)'};
+            END IF;
+          END $$;
+        `);
+      } catch (err) {
+        console.warn(`[DB] Log migration failed for column ${col}:`, err.message);
+      }
+    }
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key VARCHAR(255) PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
