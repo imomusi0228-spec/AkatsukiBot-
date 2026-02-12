@@ -263,22 +263,28 @@ router.post('/', authMiddleware, async (req, res) => {
 
     try {
         let expiryDate = null;
+        const now = new Date();
+
         if (duration) {
-            const match = duration.match(/^(\d+)([dmy])$/);
+            const match = String(duration).match(/^(\d+)([dmy])$/);
             if (match) {
                 const amount = parseInt(match[1]);
                 const unit = match[2];
-                const now = new Date();
                 if (unit === 'd') now.setDate(now.getDate() + amount);
                 else if (unit === 'm') now.setMonth(now.getMonth() + amount);
                 else if (unit === 'y') now.setFullYear(now.getFullYear() + amount);
                 expiryDate = now;
-            } else if (/^\d+$/.test(duration)) {
-                // Fallback for numeric only (treat as months)
-                const now = new Date();
+            } else if (/^\d+$/.test(String(duration))) {
                 now.setMonth(now.getMonth() + parseInt(duration));
                 expiryDate = now;
             }
+        }
+
+        // Default to 1 month if no expiry set and it's a paid tier
+        if (!expiryDate && tier !== 'Free') {
+            const defaultDate = new Date();
+            defaultDate.setMonth(defaultDate.getMonth() + 1);
+            expiryDate = defaultDate;
         }
 
         await db.query(
