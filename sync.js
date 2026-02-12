@@ -99,9 +99,10 @@ async function syncSubscriptions(client) {
 
         if (tier !== 'Free') {
             try {
-                const res = await db.query('SELECT guild_id, tier, is_active FROM subscriptions WHERE user_id = $1', [memberId]);
+                const res = await db.query('SELECT guild_id, tier, is_active, cached_username FROM subscriptions WHERE user_id = $1', [memberId]);
 
                 if (res.rows.length > 0) {
+                    const userName = member.user.globalName || member.user.username;
                     for (const row of res.rows) {
                         const currentTier = String(row.tier || '');
                         // Don't downgrade Trial to regular Pro/Pro+ if it matches the intensity
@@ -109,7 +110,9 @@ async function syncSubscriptions(client) {
                             (tier === 'Pro' && (currentTier === '1' || currentTier === '2')) ||
                             (tier === 'Pro+' && (currentTier === '3' || currentTier === '4'));
 
-                        if (!isMatch || !row.is_active) {
+                        const needsNameUpdate = row.cached_username !== userName;
+
+                        if (!isMatch || !row.is_active || needsNameUpdate) {
                             try {
                                 const sId = row.guild_id;
 
@@ -117,9 +120,10 @@ async function syncSubscriptions(client) {
                                     `UPDATE subscriptions SET 
                                     tier = $1,
                                     is_active = TRUE,
-                                    expiry_date = NULL 
-                                 WHERE guild_id = $2`,
-                                    [tier, sId]
+                                    expiry_date = NULL,
+                                    cached_username = $2 
+                                 WHERE guild_id = $3`,
+                                    [tier, userName, sId]
                                 ).catch((err) => {
                                     console.error(`[Sync] Update failed for ${sId}:`, err.message);
                                 });

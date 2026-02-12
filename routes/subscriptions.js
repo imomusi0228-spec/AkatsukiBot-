@@ -7,59 +7,96 @@ const { authMiddleware } = require('./auth');
 // GET /api/subscriptions
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM subscriptions ORDER BY expiry_date ASC');
+        const limit = parseInt(req.query.limit) || 50;
+        const page = parseInt(req.query.page) || 1;
+        const offset = (page - 1) * limit;
+        const search = req.query.search || '';
+
+        let queryText = 'SELECT * FROM subscriptions';
+        let params = [];
+        let whereClause = [];
+
+        if (search) {
+            whereClause.push('(guild_id ILIKE $1 OR user_id ILIKE $1 OR tier ILIKE $1 OR cached_username ILIKE $1 OR cached_servername ILIKE $1)');
+            params.push(`%${search}%`);
+        }
+
+        if (whereClause.length > 0) {
+            queryText += ' WHERE ' + whereClause.join(' AND ');
+        }
+
+        // Get total count for pagination
+        const countRes = await db.query(queryText.replace('SELECT *', 'SELECT COUNT(*)'), params);
+        const totalCount = parseInt(countRes.rows[0].count);
+
+        queryText += ` ORDER BY expiry_date ASC NULLS LAST LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
+
+        const result = await db.query(queryText, params);
         const subs = result.rows;
 
         // Fetch names from Discord
         const client = req.app.discordClient;
         if (client) {
+            // Optimization: Enrich in batches to avoid overwhelming the client/API
             const enrichedSubs = await Promise.all(subs.map(async sub => {
-                // Determine IDs/Tier
                 const sId = sub.guild_id || '';
-                const pTier = sub.tier || 'Free';
-
-                let serverName = 'Unknown Server';
-                let userName = 'Unknown User';
+                let serverName = sub.cached_servername || sId; // Use cache if available
+                let userName = sub.cached_username || sub.user_id || 'Unknown User';
                 let userHandle = 'unknown';
-                let userAvatar = null; // Initialize userAvatar
+                let userAvatar = null;
 
                 try {
-                    // Fetch Guild Name
+                    // Try to get from cache first
                     if (sId) {
-                        const guild = await client.guilds.fetch(sId).catch(() => null);
+                        const guild = client.guilds.cache.get(sId) || await client.guilds.fetch(sId).catch(() => null);
                         if (guild) serverName = guild.name;
                     }
 
-                    // Fetch User Name
                     if (sub.user_id) {
-                        const user = await client.users.fetch(sub.user_id).catch(() => null);
+                        const user = client.users.cache.get(sub.user_id) || await client.users.fetch(sub.user_id).catch(() => null);
                         if (user) {
                             userName = user.globalName || user.username;
                             userHandle = user.username;
-                            userAvatar = user.avatar; // Added avatar hash
+                            userAvatar = user.avatar;
                         }
                     }
+
+                    // Self-healing: Update cache if names changed
+                    if (serverName !== sub.cached_servername || userName !== sub.cached_username) {
+                        db.query('UPDATE subscriptions SET cached_username = $1, cached_servername = $2 WHERE guild_id = $3', [userName, serverName, sId]).catch(e => console.error('[Cache Update Error]', e.message));
+                    }
                 } catch (e) {
-                    console.warn(`[Enrichment] Failed for guild ${sId}: ${e.message}`);
+                    console.warn(`[Enrichment] Failed for ${sId}: ${e.message}`);
                 }
 
-                // Explicitly return all fields plus enriched data
                 return {
-                    guild_id: sId,
-                    user_id: sub.user_id,
-                    tier: pTier,
-                    expiry_date: sub.expiry_date,
-                    is_active: sub.is_active,
-                    auto_renew: sub.auto_renew, // Added auto_renew
+                    ...sub,
                     server_name: serverName,
                     user_display_name: userName,
                     user_handle: userHandle,
-                    user_avatar: userAvatar // Added user_avatar
+                    user_avatar: userAvatar
                 };
             }));
-            res.json(enrichedSubs);
+            res.json({
+                data: enrichedSubs,
+                pagination: {
+                    total: totalCount,
+                    page,
+                    limit,
+                    pages: Math.ceil(totalCount / limit)
+                }
+            });
         } else {
-            res.json(subs);
+            res.json({
+                data: subs,
+                pagination: {
+                    total: totalCount,
+                    page,
+                    limit,
+                    pages: Math.ceil(totalCount / limit)
+                }
+            });
         }
     } catch (err) {
         res.status(500).json({ error: err.message });

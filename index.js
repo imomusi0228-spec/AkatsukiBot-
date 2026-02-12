@@ -58,6 +58,20 @@ client.on('messageCreate', async (message) => {
     await handleApplicationMessage(message, client);
 });
 
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+    // If partial, we might need to fetch the full message (though usually content is available)
+    if (newMessage.partial) {
+        try {
+            await newMessage.fetch();
+        } catch (err) {
+            console.error('[Discord] Failed to fetch updated message:', err);
+            return;
+        }
+    }
+    const { handleApplicationMessage } = require('./handlers/applicationHandler');
+    await handleApplicationMessage(newMessage, client);
+});
+
 client.on('error', error => console.error('[Discord] Client Error:', error));
 client.on('shardReady', (id) => {
     console.log(`[Discord] Shard ${id} is ready.`);

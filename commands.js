@@ -41,6 +41,7 @@ async function handleInteraction(interaction) {
     if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'select_tier') {
             const selectedTier = interaction.values[0];
+            if (selectedTier === 'none') return;
             const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 
             const modal = new ModalBuilder()
@@ -61,10 +62,13 @@ async function handleInteraction(interaction) {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
+            const isSupportGuild = interaction.guildId === process.env.SUPPORT_GUILD_ID;
+
             const guildInput = new TextInputBuilder()
                 .setCustomId('guild_id')
                 .setLabel('有効化するサーバーID')
                 .setPlaceholder('例: 123456789012345678')
+                .setValue(!isSupportGuild && interaction.guildId ? interaction.guildId : '')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 

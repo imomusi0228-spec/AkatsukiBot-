@@ -4,15 +4,24 @@ const db = require('../db');
 const { authMiddleware } = require('./auth');
 const crypto = require('crypto');
 
-// Get all applications
+// Get all applications with pagination
 router.get('/', authMiddleware, async (req, res) => {
     try {
+        const limit = parseInt(req.query.limit) || 50;
+        const page = parseInt(req.query.page) || 1;
+        const offset = (page - 1) * limit;
+
+        // Get total count
+        const countRes = await db.query('SELECT COUNT(*) FROM applications');
+        const totalCount = parseInt(countRes.rows[0].count);
+
         const result = await db.query(`
             SELECT a.*, l.is_used 
             FROM applications a 
             LEFT JOIN license_keys l ON a.license_key = l.key_id 
             ORDER BY a.created_at DESC
-        `);
+            LIMIT $1 OFFSET $2
+        `, [limit, offset]);
         const apps = result.rows;
 
         // Fetch names from Discord
@@ -24,7 +33,8 @@ router.get('/', authMiddleware, async (req, res) => {
                 let userAvatar = null;
 
                 try {
-                    const user = await client.users.fetch(app.author_id).catch(() => null);
+                    // Cache-first lookup
+                    const user = client.users.cache.get(app.author_id) || await client.users.fetch(app.author_id).catch(() => null);
                     if (user) {
                         userName = user.globalName || user.username;
                         userHandle = user.username;
@@ -41,9 +51,25 @@ router.get('/', authMiddleware, async (req, res) => {
                     user_avatar: userAvatar
                 };
             }));
-            res.json(enrichedApps);
+            res.json({
+                data: enrichedApps,
+                pagination: {
+                    total: totalCount,
+                    page,
+                    limit,
+                    pages: Math.ceil(totalCount / limit)
+                }
+            });
         } else {
-            res.json(apps);
+            res.json({
+                data: apps,
+                pagination: {
+                    total: totalCount,
+                    page,
+                    limit,
+                    pages: Math.ceil(totalCount / limit)
+                }
+            });
         }
     } catch (err) {
         console.error(err);

@@ -1,9 +1,9 @@
-const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 
 module.exports = async (interaction) => {
     // Only administrators should be able to run this
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: 'このコマンドを実行する権限がありません。', ephemeral: true });
+        return interaction.reply({ content: 'このコマンドを実行する権限がありません。', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -23,6 +23,10 @@ module.exports = async (interaction) => {
         .setCustomId('select_tier')
         .setPlaceholder('希望するプランを選択してください')
         .addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel('--- プランを選択してください ---')
+                .setDescription('選択をリセットします')
+                .setValue('none'),
             new StringSelectMenuOptionBuilder()
                 .setLabel('Pro')
                 .setDescription('ベーシックな有料プラン (1サーバー)')
@@ -47,6 +51,6 @@ module.exports = async (interaction) => {
 
     const row = new ActionRowBuilder().addComponents(select);
 
-    await interaction.reply({ content: '申請パネルを設置しました。', ephemeral: true });
+    await interaction.reply({ content: '申請パネルを設置しました。', flags: MessageFlags.Ephemeral });
     await interaction.channel.send({ embeds: [embed], components: [row] });
 };

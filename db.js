@@ -96,14 +96,14 @@ async function initDB() {
     `);
 
     // Ensure all columns exist in subscriptions
-    const subCols = ['expiry_warning_sent', 'notes', 'valid_until', 'updated_at', 'auto_renew', 'start_date', 'created_at'];
+    const subCols = ['expiry_warning_sent', 'notes', 'valid_until', 'updated_at', 'auto_renew', 'start_date', 'created_at', 'cached_username', 'cached_servername'];
     for (const col of subCols) {
       try {
         await client.query(`
           DO $$ 
           BEGIN 
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='${col}') THEN
-              ALTER TABLE subscriptions ADD COLUMN ${col} ${col === 'auto_renew' || col === 'expiry_warning_sent' ? 'BOOLEAN DEFAULT FALSE' : (col === 'notes' ? 'TEXT' : 'TIMESTAMP')};
+              ALTER TABLE subscriptions ADD COLUMN ${col} ${col === 'auto_renew' || col === 'expiry_warning_sent' ? 'BOOLEAN DEFAULT FALSE' : (col === 'notes' ? 'TEXT' : (col.startsWith('cached_') ? 'VARCHAR(255)' : 'TIMESTAMP'))};
               IF '${col}' = 'updated_at' OR '${col}' = 'start_date' THEN
                 ALTER TABLE subscriptions ALTER COLUMN ${col} SET DEFAULT CURRENT_TIMESTAMP;
               END IF;
@@ -196,11 +196,18 @@ async function initDB() {
     try {
       // Ensure tier is VARCHAR in this bot's context for handling string names (Free/Pro/Pro+)
       // but accommodate Akatsuki-Bot's numeric tier
-      await client.query(`
-        ALTER TABLE subscriptions ALTER COLUMN tier TYPE VARCHAR(50) USING tier::VARCHAR;
-      `);
-
       console.log('[DB] Ensured tier column is VARCHAR type for string names.');
+
+      // Performance Optimization: Add indexes for frequently queried columns
+      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_expiry_date ON subscriptions(expiry_date);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_cached_username ON subscriptions(cached_username);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_cached_servername ON subscriptions(cached_servername);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_applications_parsed_user_id ON applications(parsed_user_id);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_applications_parsed_guild_id ON applications(parsed_guild_id);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_operation_logs_created_at ON operation_logs(created_at DESC);');
     } catch (e) {
       console.error('[DB] Normalization Error:', e.message);
     }

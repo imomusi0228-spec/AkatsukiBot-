@@ -1,12 +1,8 @@
 const db = require('../db');
+const { MessageFlags } = require('discord.js');
 
 /**
  * Handles messages in the #ライセンス申請 channel
- * Format expected:
- * ・購入者名(BOOTH): XXX
- * ・ユーザーID: 123
- * ・サーバーID: 456
- * ・希望プラン(Pro / Pro+): Pro
  */
 async function handleApplicationMessage(message, client) {
     // Only process in the specific channel
@@ -24,17 +20,45 @@ async function handleApplicationMessage(message, client) {
     }
 
     try {
-        await db.query(`
-            INSERT INTO applications (
-                message_id, channel_id, author_id, author_name, content,
-                parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (message_id) DO NOTHING
-        `, [
-            message.id, message.channel.id, message.author.id, message.author.tag, content,
-            parsed.userId, parsed.guildId, parsed.tier, parsed.boothName
-        ]);
-        console.log('[App] Application saved to database.');
+        // Check for existing application by same user and guild
+        const existing = await db.query(
+            'SELECT id FROM applications WHERE parsed_user_id = $1 AND parsed_guild_id = $2',
+            [parsed.userId, parsed.guildId]
+        );
+
+        if (existing.rows.length > 0) {
+            // Update existing
+            await db.query(`
+                UPDATE applications SET
+                    message_id = $1,
+                    channel_id = $2,
+                    author_id = $3,
+                    author_name = $4,
+                    content = $5,
+                    parsed_tier = $6,
+                    parsed_booth_name = $7,
+                    status = 'pending',
+                    created_at = CURRENT_TIMESTAMP
+                WHERE id = $8
+            `, [
+                message.id, message.channel.id, message.author.id, message.author.tag, content,
+                parsed.tier, parsed.boothName, existing.rows[0].id
+            ]);
+            console.log(`[App] Existing application updated (ID: ${existing.rows[0].id})`);
+        } else {
+            // Insert new - use ON CONFLICT to avoid errors on duplicate message process
+            await db.query(`
+                INSERT INTO applications (
+                    message_id, channel_id, author_id, author_name, content,
+                    parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (message_id) DO NOTHING
+            `, [
+                message.id, message.channel.id, message.author.id, message.author.tag, content,
+                parsed.userId, parsed.guildId, parsed.tier, parsed.boothName
+            ]);
+            console.log('[App] New application saved.');
+        }
 
         // React to show it's being processed
         await message.react('👀').catch(() => { });
@@ -68,6 +92,9 @@ function parseApplication(content) {
 }
 
 async function handleApplicationModal(interaction) {
+    // 1. Defer immediately to avoid timeout
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
     const boothName = interaction.fields.getTextInputValue('booth_name');
     const userId = interaction.fields.getTextInputValue('user_id');
     const guildId = interaction.fields.getTextInputValue('guild_id');
@@ -81,27 +108,66 @@ async function handleApplicationModal(interaction) {
     else if (tierRaw.toLowerCase() === 'trial pro+') tier = 'Trial Pro+';
 
     try {
-        await db.query(`
-            INSERT INTO applications (
-                message_id, channel_id, author_id, author_name, content,
-                parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [
-            `modal-${interaction.id}`,
-            interaction.channel.id,
-            interaction.user.id,
-            interaction.user.tag,
-            `Modal Submission: ${boothName} / ${tier}`,
-            userId,
-            guildId,
-            tier,
-            boothName,
-            'pending'
-        ]);
+        const messageId = `modal-${interaction.id}`;
 
-        await interaction.reply({
-            content: '✅ **申請を受け付けました！**\n管理者が確認次第、ライセンスを発行いたします。少々お待ちください。',
-            ephemeral: true
+        // Check for existing application by same user and guild
+        const existing = await db.query(
+            'SELECT id FROM applications WHERE parsed_user_id = $1 AND parsed_guild_id = $2',
+            [userId, guildId]
+        );
+
+        if (existing.rows.length > 0) {
+            // Update existing
+            await db.query(`
+                UPDATE applications SET
+                    message_id = $1,
+                    channel_id = $2,
+                    author_id = $3,
+                    author_name = $4,
+                    content = $5,
+                    parsed_tier = $6,
+                    parsed_booth_name = $7,
+                    status = 'pending',
+                    created_at = CURRENT_TIMESTAMP
+                WHERE id = $8
+            `, [
+                messageId,
+                interaction.channel.id,
+                interaction.user.id,
+                interaction.user.tag,
+                `Modal Submission: ${boothName} / ${tier}`,
+                tier,
+                boothName,
+                existing.rows[0].id
+            ]);
+            console.log(`[App] Existing modal application updated (ID: ${existing.rows[0].id})`);
+        } else {
+            // Insert new - handle potential race condition with ON CONFLICT
+            await db.query(`
+                INSERT INTO applications (
+                    message_id, channel_id, author_id, author_name, content,
+                    parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name, status
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ON CONFLICT (message_id) DO UPDATE SET
+                    status = 'pending',
+                    created_at = CURRENT_TIMESTAMP
+            `, [
+                messageId,
+                interaction.channel.id,
+                interaction.user.id,
+                interaction.user.tag,
+                `Modal Submission: ${boothName} / ${tier}`,
+                userId,
+                guildId,
+                tier,
+                boothName,
+                'pending'
+            ]);
+            console.log('[App] Modal application processed.');
+        }
+
+        await interaction.editReply({
+            content: '✅ **申請を受け付けました！**\n以前の申請がある場合は最新の内容に更新されました。管理者が確認次第、ライセンスを発行いたします。'
         });
 
         // Log to console
@@ -109,10 +175,13 @@ async function handleApplicationModal(interaction) {
 
     } catch (err) {
         console.error('[App] Modal Save Error:', err);
-        await interaction.reply({
-            content: '❌ 申請の保存中にエラーが発生しました。時間を置いて再度お試しください。',
-            ephemeral: true
-        });
+        try {
+            await interaction.editReply({
+                content: '❌ 申請の保存中にエラーが発生しました。時間を置いて再度お試しください。'
+            });
+        } catch (replyErr) {
+            console.error('[App] Failed to send error reply:', replyErr);
+        }
     }
 }
 

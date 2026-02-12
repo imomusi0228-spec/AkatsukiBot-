@@ -126,8 +126,11 @@
                 </ul>
 
                 <div v-if="activeTab === 'dashboard'" class="d-flex gap-2">
-                    <input type="text" id="searchInput" class="form-control form-control-sm" style="width: 250px;"
-                        v-model="searchQuery" placeholder="検索 (Ctrl+K)">
+                    <div class="input-group input-group-sm" style="width: 300px;">
+                        <input type="text" id="searchInput" class="form-control" v-model="searchQuery"
+                            placeholder="検索 (Enterで検索, Ctrl+K)" @keyup.enter="search">
+                        <button class="btn btn-outline-secondary" @click="search">検索</button>
+                    </div>
 
                     <select class="form-select form-select-sm" style="width: 150px;" v-model="filterStatus">
                         <option value="all">すべて</option>
@@ -210,13 +213,33 @@
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-light me-1"
                                         @click="openEditModal(sub)">編集</button>
-                                    <button class="btn btn-sm btn-outline-danger"
+                                    <button v-if="sub.is_active" class="btn btn-sm btn-outline-warning me-1"
                                         @click="deactivateSub(sub)">停止</button>
+                                    <button v-else class="btn btn-sm btn-outline-success me-1"
+                                        @click="resumeSub(sub)">再開</button>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                        @click="hardDeleteSub(sub)">削除</button>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Subscription Pagination -->
+                <nav v-if="subPagination.pages > 1" class="mt-3">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        <li class="page-item" :class="{ disabled: subPagination.page === 1 }">
+                            <button class="page-link" @click="changePage('sub', subPagination.page - 1)">前へ</button>
+                        </li>
+                        <li v-for="p in subPagination.pages" :key="p" class="page-item"
+                            :class="{ active: subPagination.page === p }">
+                            <button class="page-link" @click="changePage('sub', p)">{{ p }}</button>
+                        </li>
+                        <li class="page-item" :class="{ disabled: subPagination.page === subPagination.pages }">
+                            <button class="page-link" @click="changePage('sub', subPagination.page + 1)">次へ</button>
+                        </li>
+                    </ul>
+                </nav>
             </div>
 
             <!-- Tab Content: Applications -->
@@ -320,6 +343,22 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Application Pagination -->
+                <nav v-if="appPagination.pages > 1" class="mt-3">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        <li class="page-item" :class="{ disabled: appPagination.page === 1 }">
+                            <button class="page-link" @click="changePage('app', appPagination.page - 1)">前へ</button>
+                        </li>
+                        <li v-for="p in appPagination.pages" :key="p" class="page-item"
+                            :class="{ active: appPagination.page === p }">
+                            <button class="page-link" @click="changePage('app', p)">{{ p }}</button>
+                        </li>
+                        <li class="page-item" :class="{ disabled: appPagination.page === appPagination.pages }">
+                            <button class="page-link" @click="changePage('app', appPagination.page + 1)">次へ</button>
+                        </li>
+                    </ul>
+                </nav>
             </div>
 
             <!-- Tab Content: Statistics (Analysis) -->
