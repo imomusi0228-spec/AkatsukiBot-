@@ -71,14 +71,14 @@ async function handleApplicationModal(interaction) {
     const boothName = interaction.fields.getTextInputValue('booth_name');
     const userId = interaction.fields.getTextInputValue('user_id');
     const guildId = interaction.fields.getTextInputValue('guild_id');
-    const rawTier = interaction.fields.getTextInputValue('tier_choice');
 
-    // Basic normalization
-    let tier = rawTier.trim();
-    if (tier.toLowerCase() === 'pro') tier = 'Pro';
-    else if (tier.toLowerCase() === 'pro+') tier = 'Pro+';
-    else if (tier.toLowerCase() === 'trial pro') tier = 'Trial Pro';
-    else if (tier.toLowerCase() === 'trial pro+') tier = 'Trial Pro+';
+    // Extract tier from customId (format: application_modal:TierName)
+    const tierRaw = interaction.customId.split(':')[1] || 'Pro';
+    let tier = tierRaw;
+    if (tierRaw.toLowerCase() === 'pro') tier = 'Pro';
+    else if (tierRaw.toLowerCase() === 'pro+') tier = 'Pro+';
+    else if (tierRaw.toLowerCase() === 'trial pro') tier = 'Trial Pro';
+    else if (tierRaw.toLowerCase() === 'trial pro+') tier = 'Trial Pro+';
 
     try {
         await db.query(`
