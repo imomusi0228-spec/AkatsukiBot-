@@ -29,8 +29,10 @@ async function sendWebhookNotification(payload) {
         await axios.post(webhookUrl, {
             embeds: [embed]
         });
+        return { success: true };
     } catch (err) {
         console.error('[Notification Service] Failed to send webhook:', err.message);
+        return { success: false, error: err.message };
     }
 }
 

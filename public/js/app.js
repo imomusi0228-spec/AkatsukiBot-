@@ -102,7 +102,10 @@ createApp({
             appPagination.value = aRes.pagination || appPagination.value;
 
             stats.value = stData || {};
-            settings.value = setsRes || { webhook_url: '' };
+            // Merge properties to avoid losing webhook_url if it's missing from API
+            if (setsRes) {
+                Object.assign(settings.value, setsRes);
+            }
             detailedStats.value = dsData || { tier_distribution: { paid: {}, trial: {}, overall: {} }, retention_rate: 0, growth_data: [] };
 
             if (isInitial) loading.value = false;
@@ -129,8 +132,10 @@ createApp({
                 const res = await api('/settings/test-webhook', 'POST');
                 if (res.success) {
                     alert('テスト送信をリクエストしました。Discordを確認してみてください。');
+                } else if (res.error) {
+                    alert('送信失敗: ' + res.error);
                 } else {
-                    alert('送信に失敗した可能性があります。');
+                    alert('送信に失敗した可能性があります。WebhookURLが正しいか確認してください。');
                 }
             } catch (e) {
                 alert('エラーが発生しました: ' + e.message);

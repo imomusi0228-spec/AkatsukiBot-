@@ -41,7 +41,7 @@ router.post('/', authMiddleware, async (req, res) => {
 // Test webhook
 router.post('/test-webhook', authMiddleware, async (req, res) => {
     try {
-        await sendWebhookNotification({
+        const result = await sendWebhookNotification({
             title: 'Webhook Test',
             description: '管理コンソールからのテスト送信だよ。これが見えていれば、設定はバッチリだ。',
             color: 0x7aa2f7,
@@ -50,9 +50,9 @@ router.post('/test-webhook', authMiddleware, async (req, res) => {
                 { name: 'Timestamp', value: new Date().toLocaleString(), inline: true }
             ]
         });
-        res.json({ success: true });
+        res.json(result); // result includes { success, error }
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
