@@ -34,12 +34,18 @@ async function handleInteraction(interaction) {
             await handleSupportVCButton(interaction);
         } else if (interaction.customId === 'delete_support_vc') {
             await handleDeleteVCButton(interaction);
-        } else if (interaction.customId === 'start_application') {
+        }
+        return;
+    }
+
+    if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'select_tier') {
+            const selectedTier = interaction.values[0];
             const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 
             const modal = new ModalBuilder()
-                .setCustomId('application_modal')
-                .setTitle('ライセンス申請');
+                .setCustomId(`application_modal:${selectedTier}`)
+                .setTitle(`ライセンス申請 (${selectedTier})`);
 
             const boothInput = new TextInputBuilder()
                 .setCustomId('booth_name')
@@ -62,18 +68,10 @@ async function handleInteraction(interaction) {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
-            const tierInput = new TextInputBuilder()
-                .setCustomId('tier_choice')
-                .setLabel('希望プラン (Pro / Pro+ / Trial Pro / Trial Pro+)')
-                .setPlaceholder('Pro / Pro+ など')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
             modal.addComponents(
                 new ActionRowBuilder().addComponents(boothInput),
                 new ActionRowBuilder().addComponents(userInput),
-                new ActionRowBuilder().addComponents(guildInput),
-                new ActionRowBuilder().addComponents(tierInput)
+                new ActionRowBuilder().addComponents(guildInput)
             );
 
             await interaction.showModal(modal);
@@ -82,7 +80,7 @@ async function handleInteraction(interaction) {
     }
 
     if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'application_modal') {
+        if (interaction.customId.startsWith('application_modal')) {
             const { handleApplicationModal } = require('./handlers/applicationHandler');
             await handleApplicationModal(interaction);
         }
