@@ -1,5 +1,6 @@
 const db = require('../db');
 const { MessageFlags } = require('discord.js');
+const { sendWebhookNotification } = require('../services/notif');
 
 /**
  * Handles messages in the #ライセンス申請 channel
@@ -62,6 +63,19 @@ async function handleApplicationMessage(message, client) {
 
         // React to show it's being processed
         await message.react('👀').catch(() => { });
+
+        // Notify admins via webhook
+        await sendWebhookNotification({
+            title: '📝 新規ライセンス申請 (メッセージ)',
+            description: `新しいライセンス申請がメッセージから届きました。`,
+            color: 0x00ff00,
+            fields: [
+                { name: '申請者', value: `${message.author.tag} (${message.author.id})`, inline: true },
+                { name: '希望プラン', value: parsed.tier, inline: true },
+                { name: 'サーバーID', value: `\`${parsed.guildId}\``, inline: true },
+                { name: 'Booth名', value: parsed.boothName, inline: true }
+            ]
+        });
     } catch (err) {
         console.error('[App] Error saving application:', err);
     }
@@ -165,6 +179,19 @@ async function handleApplicationModal(interaction) {
             ]);
             console.log('[App] Modal application processed.');
         }
+
+        // Notify admins via webhook
+        await sendWebhookNotification({
+            title: '📝 新規ライセンス申請 (モーダル)',
+            description: `新しいライセンス申請がフォームから届きました。`,
+            color: 0x00ff00,
+            fields: [
+                { name: '申請者', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+                { name: '希望プラン', value: tier, inline: true },
+                { name: 'サーバーID', value: `\`${guildId}\``, inline: true },
+                { name: 'Booth名', value: boothName, inline: true }
+            ]
+        });
 
         await interaction.editReply({
             content: '✅ **申請を受け付けました！**\n以前の申請がある場合は最新の内容に更新されました。管理者が確認次第、ライセンスを発行いたします。'
