@@ -81,10 +81,14 @@ router.post('/announce', authMiddleware, async (req, res) => {
 
     try {
         const tasksJson = JSON.stringify(associated_tasks || []);
+        const { replaceMilestonePlaceholders } = require('../services/milestones');
+        const processedTitle = replaceMilestonePlaceholders(title);
+        const processedContent = replaceMilestonePlaceholders(content);
+
         if (scheduled_at) {
             await db.query(
                 'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks) VALUES ($1, $2, $3, $4, $5)',
-                [title, content, type || 'normal', scheduled_at, tasksJson]
+                [processedTitle, processedContent, type || 'normal', scheduled_at, tasksJson]
             );
             return res.json({ success: true, message: 'Announcement scheduled' });
         }
@@ -100,8 +104,8 @@ router.post('/announce', authMiddleware, async (req, res) => {
         }
 
         const embed = {
-            title: title,
-            description: content,
+            title: processedTitle,
+            description: processedContent,
             color: type === 'important' ? 0xff0000 : 0x00ff00,
             timestamp: new Date().toISOString(),
             footer: {

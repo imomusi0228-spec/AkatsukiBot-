@@ -584,6 +584,9 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">告知内容</label>
+                        <div class="form-text text-muted mb-2">
+                            <i class="bi bi-info-circle me-1"></i> <code>{{M1}}</code> 〜 <code>{{M5}}</code> と入力すると、対応するマイルストーンの内容に自動置換されます。
+                        </div>
                         <textarea v-model="announceModal.content" class="form-control" rows="10"
                             placeholder="告知の詳細内容を入力してください。Markdownが使用可能です。"></textarea>
                     </div>
