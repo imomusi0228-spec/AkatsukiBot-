@@ -11,75 +11,31 @@ const pool = new Pool({
 async function initDB() {
   const client = await pool.connect();
   try {
-    // 1. Migration: server_id -> guild_id (Unify with Akatsuki-Bot)
-    try {
-      const res = await client.query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'subscriptions' AND column_name = 'server_id'
-      `);
-      if (res.rows.length > 0) {
-        const check = await client.query(`
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'subscriptions' AND column_name = 'guild_id'
-        `);
-        if (check.rows.length === 0) {
-          await client.query('ALTER TABLE subscriptions RENAME COLUMN server_id TO guild_id');
-          console.log('[DB] Migrated server_id to guild_id');
-        } else {
-          console.log('[DB] Both guild_id and server_id exist. Using guild_id.');
+    // 1. Initial Migrations (Legacy field normalization)
+    // server_id -> guild_id, plan_tier -> tier
+    const tablesToCheck = ['subscriptions', 'license_keys', 'applications'];
+    for (const table of tablesToCheck) {
+      try {
+        const colsRes = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}'`);
+        const cols = colsRes.rows.map(r => r.column_name);
+
+        if (cols.includes('server_id') && !cols.includes('guild_id')) {
+          await client.query(`ALTER TABLE ${table} RENAME COLUMN server_id TO guild_id`);
         }
+        if (cols.includes('parsed_server_id') && !cols.includes('parsed_guild_id')) {
+          await client.query(`ALTER TABLE ${table} RENAME COLUMN parsed_server_id TO parsed_guild_id`);
+        }
+        if (cols.includes('plan_tier') && !cols.includes('tier')) {
+          await client.query(`ALTER TABLE ${table} RENAME COLUMN plan_tier TO tier`);
+        }
+      } catch (e) {
+        console.warn(`[DB Migration] Table ${table} normalization warning:`, e.message);
       }
-    } catch (e) {
-      console.error('[DB] Guild ID Migration Error:', e.message);
     }
 
-    // 2. Migration: plan_tier -> tier (Unify with Akatsuki-Bot)
-    try {
-      const res = await client.query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'subscriptions' AND column_name = 'plan_tier'
-      `);
-      if (res.rows.length > 0) {
-        const check = await client.query(`
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'subscriptions' AND column_name = 'tier'
-        `);
-        if (check.rows.length === 0) {
-          await client.query('ALTER TABLE subscriptions RENAME COLUMN plan_tier TO tier');
-          console.log('[DB] Migrated plan_tier to tier');
-        } else {
-          // If both exist, we might want to drop the old one if it's redundant
-          // For safety in this shared DB environment, let's just make sure tier is used.
-          console.log('[DB] Both tier and plan_tier exist. Using tier.');
-        }
-      }
-    } catch (e) {
-      console.error('[DB] Tier Migration Error:', e.message);
-    }
-
-    // 3. Migration: license_keys.plan_tier -> tier
-    try {
-      const res = await client.query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'license_keys' AND column_name = 'plan_tier'
-      `);
-      if (res.rows.length > 0) {
-        const check = await client.query(`
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'license_keys' AND column_name = 'tier'
-        `);
-        if (check.rows.length === 0) {
-          await client.query('ALTER TABLE license_keys RENAME COLUMN plan_tier TO tier');
-          console.log('[DB] Migrated license_keys.plan_tier to tier');
-        }
-      }
-    } catch (e) {
-      console.error('[DB] License Key Tier Migration Error:', e.message);
-    }
-
-    // 4. Ensure tables exist
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS subscriptions (
+    // 2. Define Tables
+    const tables = {
+      subscriptions: `
         guild_id VARCHAR(255) PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         tier VARCHAR(50) NOT NULL,
@@ -90,33 +46,14 @@ async function initDB() {
         expiry_warning_sent BOOLEAN DEFAULT FALSE,
         notes TEXT,
         valid_until TIMESTAMP,
+        cached_username VARCHAR(255),
+        cached_servername VARCHAR(255),
+        current_milestone INTEGER DEFAULT 1,
+        auto_unlock_enabled BOOLEAN DEFAULT FALSE,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // Ensure all columns exist in subscriptions
-    const subCols = ['expiry_warning_sent', 'notes', 'valid_until', 'updated_at', 'auto_renew', 'start_date', 'created_at', 'cached_username', 'cached_servername'];
-    for (const col of subCols) {
-      try {
-        await client.query(`
-          DO $$ 
-          BEGIN 
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='${col}') THEN
-              ALTER TABLE subscriptions ADD COLUMN ${col} ${col === 'auto_renew' || col === 'expiry_warning_sent' ? 'BOOLEAN DEFAULT FALSE' : (col === 'notes' ? 'TEXT' : (col.startsWith('cached_') ? 'VARCHAR(255)' : 'TIMESTAMP'))};
-              IF '${col}' = 'updated_at' OR '${col}' = 'start_date' THEN
-                ALTER TABLE subscriptions ALTER COLUMN ${col} SET DEFAULT CURRENT_TIMESTAMP;
-              END IF;
-            END IF;
-          END $$;
-        `);
-      } catch (err) {
-        console.warn(`[DB] Migration failed for column ${col}:`, err.message);
-      }
-    }
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS applications (
+      `,
+      applications: `
         id SERIAL PRIMARY KEY,
         message_id VARCHAR(255) UNIQUE NOT NULL,
         channel_id VARCHAR(255) NOT NULL,
@@ -131,31 +68,8 @@ async function initDB() {
         auto_processed BOOLEAN DEFAULT FALSE,
         license_key VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // Migration for applications: parsed_server_id -> parsed_guild_id
-    try {
-      const res = await client.query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'applications' AND column_name = 'parsed_server_id'
-      `);
-      if (res.rows.length > 0) {
-        const check = await client.query(`
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'applications' AND column_name = 'parsed_guild_id'
-        `);
-        if (check.rows.length === 0) {
-          await client.query('ALTER TABLE applications RENAME COLUMN parsed_server_id TO parsed_guild_id');
-          console.log('[DB] Migrated parsed_server_id to parsed_guild_id');
-        }
-      }
-    } catch (e) {
-      console.error('[DB] App Server ID Migration Error:', e.message);
-    }
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS user_sessions (
+      `,
+      user_sessions: `
         session_id VARCHAR(255) PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         username VARCHAR(255),
@@ -163,11 +77,8 @@ async function initDB() {
         discriminator VARCHAR(255),
         expiry TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS license_keys (
+      `,
+      license_keys: `
         key_id VARCHAR(50) PRIMARY KEY,
         tier VARCHAR(50) NOT NULL,
         duration_months INTEGER NOT NULL,
@@ -177,11 +88,8 @@ async function initDB() {
         reserved_user_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         notes TEXT
-      );
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS operation_logs (
+      `,
+      operation_logs: `
         id SERIAL PRIMARY KEY,
         operator_id VARCHAR(255) NOT NULL,
         operator_name VARCHAR(255),
@@ -191,69 +99,71 @@ async function initDB() {
         details TEXT,
         metadata JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // Ensure columns exist for older operation_logs table
-    const logCols = ['target_name', 'metadata'];
-    for (const col of logCols) {
-      try {
-        await client.query(`
-          DO $$ 
-          BEGIN 
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='operation_logs' AND column_name='${col}') THEN
-              ALTER TABLE operation_logs ADD COLUMN ${col} ${col === 'metadata' ? 'JSONB' : 'VARCHAR(255)'};
-            END IF;
-          END $$;
-        `);
-      } catch (err) {
-        console.warn(`[DB] Log migration failed for column ${col}:`, err.message);
-      }
-    }
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS bot_system_settings (
+      `,
+      bot_system_settings: `
         key VARCHAR(255) PRIMARY KEY,
         value TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS scheduled_announcements (
+      `,
+      scheduled_announcements: `
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         type VARCHAR(50) DEFAULT 'normal',
         scheduled_at TIMESTAMP NOT NULL,
         sent_at TIMESTAMP,
+        associated_tasks JSONB DEFAULT '[]',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+      `
+    };
 
-    // 4. Final Cleanup/Normalization
-    try {
-      // Ensure tier is VARCHAR in this bot's context for handling string names (Free/Pro/Pro+)
-      // but accommodate Akatsuki-Bot's numeric tier
-      console.log('[DB] Ensured tier column is VARCHAR type for string names.');
-
-      // Performance Optimization: Add indexes for frequently queried columns
-      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_expiry_date ON subscriptions(expiry_date);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_cached_username ON subscriptions(cached_username);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_cached_servername ON subscriptions(cached_servername);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_applications_parsed_user_id ON applications(parsed_user_id);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_applications_parsed_guild_id ON applications(parsed_guild_id);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_operation_logs_created_at ON operation_logs(created_at DESC);');
-    } catch (e) {
-      console.error('[DB] Normalization Error:', e.message);
+    for (const [name, schema] of Object.entries(tables)) {
+      await client.query(`CREATE TABLE IF NOT EXISTS ${name} (${schema})`);
     }
 
-    console.log('Database tables initialized.');
+    // 3. Ensure Columns (Handle additions for existing tables)
+    const essentialColumns = {
+      subscriptions: [
+        ['current_milestone', 'INTEGER DEFAULT 1'],
+        ['auto_unlock_enabled', 'BOOLEAN DEFAULT FALSE'],
+        ['updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP']
+      ],
+      scheduled_announcements: [
+        ['associated_tasks', "JSONB DEFAULT '[]'"]
+      ],
+      operation_logs: [
+        ['target_name', 'VARCHAR(255)'],
+        ['metadata', 'JSONB']
+      ]
+    };
+
+    for (const [table, columns] of Object.entries(essentialColumns)) {
+      for (const [colName, colDef] of columns) {
+        await client.query(`
+          DO $$ 
+          BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='${table}' AND column_name='${colName}') THEN
+              ALTER TABLE ${table} ADD COLUMN ${colName} ${colDef};
+            END IF;
+          END $$;
+        `);
+      }
+    }
+
+    // 4. Performance: Indexes
+    const indexes = [
+      'idx_subscriptions_user_id ON subscriptions(user_id)',
+      'idx_subscriptions_is_active ON subscriptions(is_active)',
+      'idx_applications_status ON applications(status)',
+      'idx_operation_logs_created_at ON operation_logs(created_at DESC)'
+    ];
+    for (const idx of indexes) {
+      await client.query(`CREATE INDEX IF NOT EXISTS ${idx}`);
+    }
+
+    console.log('[DB] Initialization and consolidation complete.');
   } catch (err) {
-    console.error('Error initializing database:', err);
+    console.error('[DB Error]', err);
   } finally {
     client.release();
   }

@@ -227,6 +227,20 @@ createApp({
             loadData();
         }
 
+        const updateMilestone = async () => {
+            const gId = editModal.data.guild_id;
+            const res = await api(`/subscriptions/${gId}/milestone`, 'PATCH', {
+                current_milestone: parseInt(editModal.data.current_milestone),
+                auto_unlock_enabled: editModal.data.auto_unlock_enabled
+            });
+            if (res.success) {
+                // Keep local state or reload
+                loadData();
+            } else {
+                alert('マイルストーンの更新に失敗しました: ' + (res.error || 'Unknown error'));
+            }
+        };
+
         const createSub = async () => {
             if (!addModal.data.guild_id || !addModal.data.user_id) {
                 alert('サーバーIDとユーザーIDは必須やな');
@@ -285,7 +299,7 @@ createApp({
 
         const sendAnnouncement = async () => {
             if (!announceModal.title || !announceModal.content) {
-                alert('タイトルと内容を入力してください');
+                alert('タイトルと内容は必須やな');
                 return;
             }
             announceModal.sending = true;
@@ -294,20 +308,21 @@ createApp({
                     title: announceModal.title,
                     content: announceModal.content,
                     type: announceModal.type,
-                    scheduled_at: announceModal.scheduled_at
+                    scheduled_at: announceModal.scheduled_at,
+                    associated_tasks: announceModal.associated_tasks
                 });
                 if (res.success) {
-                    alert(announceModal.scheduled_at ? '告知を予約しました' : '告知を送信しました');
+                    alert('告知を送信/予約したで！');
                     announceModal.title = '';
                     announceModal.content = '';
+                    announceModal.type = 'normal';
                     announceModal.scheduled_at = '';
+                    announceModal.associated_tasks = [];
                     loadAnnouncements();
                     activeTab.value = 'dashboard';
                 } else {
-                    alert('エラー: ' + res.error);
+                    alert('エラー: ' + (res.error || '不明なエラー'));
                 }
-            } catch (e) {
-                alert('送信に失敗しました');
             } finally {
                 announceModal.sending = false;
             }
@@ -421,7 +436,7 @@ createApp({
         // Modal States (Restored)
         const editModal = reactive({
             show: false,
-            data: { guild_id: '', tier: 'Pro', expiry_date: null, auto_renew: false },
+            data: { guild_id: '', tier: 'Pro', expiry_date: null, auto_renew: false, current_milestone: 1, auto_unlock_enabled: false },
             extendDuration: 1,
             extendUnit: 'm'
         });
@@ -442,12 +457,12 @@ createApp({
             content: '',
             type: 'normal',
             scheduled_at: '',
+            associated_tasks: [],
             sending: false
         });
         const announcements = ref([]);
         const editAnnounceModal = reactive({
-            instance: null,
-            data: { id: null, title: '', content: '', type: 'normal', scheduled_at: '' }
+            data: { id: null, title: '', content: '', type: 'normal', scheduled_at: '', associated_tasks: [] }
         });
 
         const loadAnnouncements = async () => {
@@ -465,7 +480,7 @@ createApp({
         };
 
         const openEditAnnounceModal = (ann) => {
-            editAnnounceModal.data = { ...ann };
+            editAnnounceModal.data = { ...ann, associated_tasks: ann.associated_tasks || [] };
             if (ann.scheduled_at) {
                 const d = new Date(ann.scheduled_at);
                 const offset = d.getTimezoneOffset() * 60000;
@@ -498,7 +513,7 @@ createApp({
             searchQuery, filterStatus, settings, selectedSubs,
             editModal, addModal, keyModal, appDetailsModal,
             formatDate, deactivateSub, resumeSub, hardDeleteSub, toggleAutoRenew, copyText,
-            openEditModal, saveEdit, updateTier, createSub,
+            openEditModal, saveEdit, updateTier, createSub, updateMilestone,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData, changePage, search, showOverallPie,
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,

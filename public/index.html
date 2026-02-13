@@ -596,15 +596,33 @@
                     </div>
                     <div class="mb-4">
                         <label class="form-label">送信予約日時 <small class="text-muted">(空欄で即時送信)</small></label>
-                        <input type="datetime-local" v-model="announceModal.scheduled_at" class="form-control">
+                        <input type="datetime-local" v-model="announceModal.scheduled_at" class="form-control mb-3">
+
+                        <label class="form-label">連動タスクの実行</label>
+                        <div class="d-flex flex-wrap gap-3 p-3 bg-dark-subtle rounded-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="sync_subs"
+                                    v-model="announceModal.associated_tasks" id="task_sync">
+                                <label class="form-check-label" for="task_sync">サブスク同期</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="milestone_check"
+                                    v-model="announceModal.associated_tasks" id="task_milestone">
+                                <label class="form-check-label" for="task_milestone">マイルストーン一括チェック</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="cleanup_logs"
+                                    v-model="announceModal.associated_tasks" id="task_cleanup">
+                                <label class="form-check-label" for="task_cleanup">旧ログ削除</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="d-grid">
-                        <button class="btn btn-primary btn-lg" @click="sendAnnouncement"
-                            :disabled="announceModal.sending">
-                            <span v-if="announceModal.sending" class="spinner-border spinner-border-sm me-2"></span>
-                            サポートサーバーに投稿する
-                        </button>
-                    </div>
+
+                    <button class="btn btn-primary w-100 py-2 fw-bold" @click="sendAnnouncement"
+                        :disabled="announceModal.sending">
+                        <span v-if="announceModal.sending" class="spinner-border spinner-border-sm me-2"></span>
+                        サポートサーバーに投稿する
+                    </button>
                 </div>
 
                 <div class="panel p-4 mt-4" style="max-width: 1000px; margin: 0 auto;">
@@ -676,6 +694,31 @@
                                         <option value="Pro+">Pro+ (プロプラス)</option>
                                     </select>
                                     <button class="btn btn-outline-primary" @click="updateTier">変更保存</button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label text-accent fw-bold"><i
+                                        class="bi bi-rocket-takeoff me-1"></i>マイルストーン管理</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted mb-1">現在の階層</label>
+                                        <select v-model="editModal.data.current_milestone"
+                                            class="form-select form-select-sm" @change="updateMilestone">
+                                            <option :value="1">M1: 登録 & VC基本</option>
+                                            <option :value="2">M2: 多言語 & 監査</option>
+                                            <option :value="3">M3: 分析 & データ</option>
+                                            <option :value="4">M4: 高度なセキュリティ</option>
+                                            <option :value="5">M5: すべて開放</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 d-flex align-items-end pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox"
+                                                v-model="editModal.data.auto_unlock_enabled" @change="updateMilestone">
+                                            <label class="form-check-label small">1週間ごとに自動開放</label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -822,25 +865,49 @@
                                         <option value="important">重要 (赤)</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">送信予定日時</label>
-                                    <input type="datetime-local" v-model="editAnnounceModal.data.scheduled_at"
-                                        class="form-control bg-dark text-white border-secondary">
+                                <input type="datetime-local" v-model="editAnnounceModal.data.scheduled_at"
+                                    class="form-control bg-dark text-white border-secondary">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label class="form-label">連動タスクの実行</label>
+                            <div class="d-flex flex-wrap gap-3 p-2 border border-secondary rounded">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="sync_subs"
+                                        v-model="editAnnounceModal.data.associated_tasks"
+                                        :id="'edit_task_sync_'+editAnnounceModal.data.id">
+                                    <label class="form-check-label"
+                                        :for="'edit_task_sync_'+editAnnounceModal.data.id">サブスク同期</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="milestone_check"
+                                        v-model="editAnnounceModal.data.associated_tasks"
+                                        :id="'edit_task_milestone_'+editAnnounceModal.data.id">
+                                    <label class="form-check-label"
+                                        :for="'edit_task_milestone_'+editAnnounceModal.data.id">マイルストーン一括チェック</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="cleanup_logs"
+                                        v-model="editAnnounceModal.data.associated_tasks"
+                                        :id="'edit_task_cleanup_'+editAnnounceModal.data.id">
+                                    <label class="form-check-label"
+                                        :for="'edit_task_cleanup_'+editAnnounceModal.data.id">旧ログ削除</label>
                                 </div>
                             </div>
                         </div>
-                        <div class="modal-footer border-secondary">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                            <button type="button" class="btn btn-primary" @click="saveAnnounceEdit">変更を保存</button>
-                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="button" class="btn btn-primary" @click="saveAnnounceEdit">変更を保存</button>
                     </div>
                 </div>
             </div>
-
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script src="js/app.js"></script>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
 </body>
 
 </html>
