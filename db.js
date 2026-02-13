@@ -219,6 +219,18 @@ async function initDB() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS scheduled_announcements (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'normal',
+        scheduled_at TIMESTAMP NOT NULL,
+        sent_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 4. Final Cleanup/Normalization
     try {
       // Ensure tier is VARCHAR in this bot's context for handling string names (Free/Pro/Pro+)

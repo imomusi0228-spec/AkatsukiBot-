@@ -28,7 +28,6 @@ createApp({
             retention_rate: 0,
             growth_data: []
         });
-
         // Filters & Search
         const searchQuery = ref('');
         const filterStatus = ref('all'); // all, active, expired, expiring
@@ -294,12 +293,15 @@ createApp({
                 const res = await api('/announce', 'POST', {
                     title: announceModal.title,
                     content: announceModal.content,
-                    type: announceModal.type
+                    type: announceModal.type,
+                    scheduled_at: announceModal.scheduled_at
                 });
                 if (res.success) {
-                    alert('告知を送信しました');
+                    alert(announceModal.scheduled_at ? '告知を予約しました' : '告知を送信しました');
                     announceModal.title = '';
                     announceModal.content = '';
+                    announceModal.scheduled_at = '';
+                    loadAnnouncements();
                     activeTab.value = 'dashboard';
                 } else {
                     alert('エラー: ' + res.error);
@@ -439,8 +441,53 @@ createApp({
             title: '',
             content: '',
             type: 'normal',
+            scheduled_at: '',
             sending: false
         });
+        const announcements = ref([]);
+        const editAnnounceModal = reactive({
+            instance: null,
+            data: { id: null, title: '', content: '', type: 'normal', scheduled_at: '' }
+        });
+
+        const loadAnnouncements = async () => {
+            const res = await api('/announce', 'GET');
+            if (res) announcements.value = res;
+        };
+
+        const deleteAnnouncement = async (id) => {
+            if (!confirm('この告知を削除（キャンセル）しますか？')) return;
+            const res = await api(`/announce/${id}`, 'DELETE');
+            if (res.success) {
+                alert('削除しました');
+                loadAnnouncements();
+            }
+        };
+
+        const openEditAnnounceModal = (ann) => {
+            editAnnounceModal.data = { ...ann };
+            if (ann.scheduled_at) {
+                const d = new Date(ann.scheduled_at);
+                const offset = d.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(d - offset)).toISOString().slice(0, 16);
+                editAnnounceModal.data.scheduled_at = localISOTime;
+            }
+            if (!editAnnounceModal.instance) {
+                editAnnounceModal.instance = new bootstrap.Modal(document.getElementById('editAnnounceModal'));
+            }
+            editAnnounceModal.instance.show();
+        };
+
+        const saveAnnounceEdit = async () => {
+            const res = await api(`/announce/${editAnnounceModal.data.id}`, 'PUT', editAnnounceModal.data);
+            if (res.success) {
+                alert('更新しました');
+                editAnnounceModal.instance.hide();
+                loadAnnouncements();
+            } else {
+                alert('エラー: ' + res.error);
+            }
+        };
 
         // ... methods (formatDate, toggleAutoRenew, etc.) ...
 
@@ -455,7 +502,8 @@ createApp({
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData, changePage, search, showOverallPie,
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,
-            toggleSelectAll, bulkDeactivate
+            toggleSelectAll, bulkDeactivate,
+            announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit
         };
     }
 }).mount('#app');
