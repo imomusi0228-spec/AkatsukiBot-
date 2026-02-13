@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { authMiddleware } = require('./auth');
+const { authMiddleware } = require('./middleware');
 
 // Get all settings
 router.get('/', authMiddleware, async (req, res) => {
@@ -17,7 +17,7 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
-const { sendWebhookNotification } = require('../services/notificationService');
+const { sendWebhookNotification } = require('../services/notif');
 
 // Update or set a setting
 router.post('/', authMiddleware, async (req, res) => {

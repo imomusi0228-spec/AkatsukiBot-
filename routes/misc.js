@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { syncSubscriptions } = require('../sync');
-const { authMiddleware } = require('./auth');
+const { authMiddleware } = require('./middleware');
 
 /**
  * Execute tasks associated with an announcement
@@ -156,4 +156,33 @@ router.delete('/announce/:id', authMiddleware, async (req, res) => {
     }
 });
 
-module.exports = { router, executeAnnouncementTasks };
+// POST /api/updates/receive (新設: メインBotからのアプデ情報受信)
+router.post('/updates/receive', async (req, res) => {
+    const { title, content, token } = req.body;
+
+    // 簡単なトークン認証
+    if (!token || token !== process.env.ADMIN_TOKEN) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!title || !content) {
+        return res.status(400).json({ error: 'Title and content are required' });
+    }
+
+    try {
+        // 下書きとして保存 (2099年に設定して告知一覧の下の方、もしくは「下書き」として扱う)
+        const draftDate = new Date('2099-12-31T00:00:00');
+        await db.query(
+            'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks) VALUES ($1, $2, $3, $4, $5)',
+            [title, content, 'normal', draftDate, JSON.stringify([])]
+        );
+
+        res.json({ success: true, message: 'Update draft received' });
+    } catch (err) {
+        console.error('[Updates] Failed to receive:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+module.exports = router;
+module.exports.executeAnnouncementTasks = executeAnnouncementTasks;

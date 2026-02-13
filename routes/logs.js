@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { authMiddleware } = require('./auth');
+const { authMiddleware } = require('./middleware');
 
 // Get paginated and searchable logs
 router.get('/', authMiddleware, async (req, res) => {

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { authMiddleware } = require('./auth');
+const { authMiddleware } = require('./middleware');
 const crypto = require('crypto');
-const { sendWebhookNotification } = require('../services/notificationService');
+const { sendWebhookNotification } = require('../services/notif');
 
 // Get all applications with pagination
 router.get('/', authMiddleware, async (req, res) => {

@@ -4,12 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth'); // Imports { router, authMiddleware }
-const subscriptionRoutes = require('./routes/subscriptions');
-const miscRoutes = require('./routes/misc');
-const applicationRoutes = require('./routes/applications');
-const settingsRoutes = require('./routes/settings');
-const logRoutes = require('./routes/logs');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,13 +43,32 @@ app.use(cookieParser());
 // Health Check Endpoint (Keep-Alive)
 app.get('/health', (req, res) => res.sendStatus(200));
 
-// Mount Routes
-app.use('/api/auth', authRoutes.router);
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/applications', applicationRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/logs', logRoutes);
-app.use('/api', miscRoutes); // mounts /api/sync
+const path = require('path');
+
+// Mount Routes with Safety Check
+const routes = [
+    { path: '/api/auth', module: 'auth' },
+    { path: '/api/subscriptions', module: 'subscriptions' },
+    { path: '/api/applications', module: 'applications' },
+    { path: '/api/settings', module: 'settings' },
+    { path: '/api/logs', module: 'logs' },
+    { path: '/api', module: 'misc' }
+];
+
+routes.forEach(route => {
+    try {
+        const routePath = path.join(__dirname, 'routes', route.module);
+        const handler = require(routePath);
+        if (typeof handler === 'function') {
+            app.use(route.path, handler);
+        } else {
+            console.error(`[Router Error] Module "${route.module}" did not export a function (exported: ${typeof handler}). Path: ${routePath}`);
+            // Fallback to empty router if possible, or just skip if it's already broken
+        }
+    } catch (err) {
+        console.error(`[Router Fatal] Failed to load module "${route.module}":`, err.message);
+    }
+});
 
 function startServer(client) {
     app.discordClient = client;

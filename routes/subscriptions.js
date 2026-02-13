@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { updateMemberRoles } = require('../sync');
-const { authMiddleware } = require('./auth');
-const { sendWebhookNotification } = require('../services/notificationService');
+const { authMiddleware } = require('./middleware');
+const { sendWebhookNotification } = require('../services/notif');
 
 // GET /api/subscriptions
 router.get('/', authMiddleware, async (req, res) => {

@@ -652,11 +652,15 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge" :class="ann.sent_at ? 'bg-secondary' : 'bg-warning'">
-                                            {{ ann.sent_at ? '送信済み' : '予約中' }}
+                                        <span class="badge"
+                                            :class="ann.sent_at ? 'bg-secondary' : (new Date(ann.scheduled_at) > new Date('2090-01-01') ? 'bg-info' : 'bg-warning')">
+                                            {{ ann.sent_at ? '送信済み' : (new Date(ann.scheduled_at) > new
+                                            Date('2090-01-01') ? '下書き' : '予約中') }}
                                         </span>
                                     </td>
                                     <td class="text-end">
+                                        <button v-if="!ann.sent_at" class="btn btn-sm btn-success me-1"
+                                            @click="postNow(ann)">今すぐ送信</button>
                                         <button v-if="!ann.sent_at" class="btn btn-sm btn-outline-primary me-1"
                                             @click="openEditAnnounceModal(ann)">編集</button>
                                         <button class="btn btn-sm btn-outline-danger"

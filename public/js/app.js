@@ -108,6 +108,7 @@ createApp({
             detailedStats.value = dsData || { tier_distribution: { paid: {}, trial: {}, overall: {} }, retention_rate: 0, growth_data: [] };
 
             if (isInitial) loading.value = false;
+            loadAnnouncements(); // Fetch announcements too
         };
 
         const loadLogs = async (page = 1) => {
@@ -319,12 +320,35 @@ createApp({
                     announceModal.scheduled_at = '';
                     announceModal.associated_tasks = [];
                     loadAnnouncements();
-                    activeTab.value = 'dashboard';
                 } else {
                     alert('エラー: ' + (res.error || '不明なエラー'));
                 }
             } finally {
                 announceModal.sending = false;
+            }
+        };
+
+        const postNow = async (ann) => {
+            if (!confirm('この告知を今すぐ送信する？')) return;
+            const res = await api(`/announce/${ann.id}`, 'PUT', {
+                ...ann,
+                scheduled_at: null // Set to null effectively sends it now in logic or we can just send it now
+            });
+            if (res.success) {
+                // Actually, let's just use the existing POST logic but for this ID
+                // For now, let's trigger it by updating scheduled_at to past
+                const postRes = await api(`/announce/${ann.id}`, 'PUT', {
+                    title: ann.title,
+                    content: ann.content,
+                    type: ann.type,
+                    scheduled_at: new Date().toISOString(),
+                    associated_tasks: ann.associated_tasks
+                });
+
+                if (postRes.success) {
+                    alert('送信したで！');
+                    loadAnnouncements();
+                }
             }
         };
 
@@ -518,7 +542,7 @@ createApp({
             loadData, changePage, search, showOverallPie,
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,
             toggleSelectAll, bulkDeactivate,
-            announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit
+            announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit, postNow
         };
     }
 }).mount('#app');
