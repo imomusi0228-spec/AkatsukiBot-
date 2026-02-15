@@ -576,16 +576,53 @@
             <div v-if="activeTab === 'announce'" class="px-3">
 
                 <div class="panel p-4" style="max-width: 800px; margin: 0 auto;">
-                    <h4 class="mb-4">新規告知作成</h4>
+                    <div class="mb-4">
+                        <label class="form-label d-flex justify-content-between">
+                            テンプレート選択
+                            <small class="text-muted">クリックで内容を自動生成</small>
+                        </label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-info" @click="applyTemplate('update')">✨
+                                アップデート</button>
+                            <button class="btn btn-sm btn-outline-warning" @click="applyTemplate('maintenance')">🔧
+                                メンテナンス</button>
+                            <button class="btn btn-sm btn-outline-danger" @click="applyTemplate('fix')">🐞
+                                不具合修正</button>
+                            <button class="btn btn-sm btn-outline-secondary" @click="applyTemplate('milestone')">📊
+                                マイルストーン</button>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">告知タイトル</label>
-                        <input type="text" v-model="announceModal.title" class="form-control"
-                            placeholder="例: ボットのアップデートのお知らせ (v1.2.0)">
+                        <div class="input-group">
+                            <input type="text" v-model="announceModal.title" class="form-control"
+                                placeholder="例: ボットのアップデートのお知らせ (v1.2.0)">
+                            <button class="btn btn-outline-secondary" @click="fetchBotVersion" title="最新バージョンを取得">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path
+                                        d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-1.34 3H6.262a.25.25 0 0 1-.192-.41l1.966-2.36a.25.25 0 0 1 .384 0l1.966 2.36a.25.25 0 0 1-.192.41zM4 11a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm1-8.534V0h-2v2.466C1.192 3.12 0 5.06 0 7s1.192 3.88 3.034 4.534V14h2v-2.466C6.808 10.88 8 8.94 8 7s-1.192-3.88-3.034-4.534z" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">告知内容</label>
+                        <label class="form-label d-flex justify-content-between">
+                            告知内容
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" @click="insertText('**', '**')"
+                                    title="太字"><b>B</b></button>
+                                <button class="btn btn-outline-secondary" @click="insertText('`', '`')" title="コード部分">`
+                                    `</button>
+                                <button class="btn btn-outline-secondary" @click="insertText('```\n', '\n```')"
+                                    title="コードブロック">code</button>
+                                <button class="btn btn-outline-secondary" @click="insertText('- ')"
+                                    title="リスト">-</button>
+                            </div>
+                        </label>
                         <div class="form-text text-muted mb-2">
-                            <i class="bi bi-info-circle me-1"></i> <code>{{M1}}</code> 〜 <code>{{M5}}</code> と入力すると、対応するマイルストーンの内容に自動置換されます。
+                            <i class="bi bi-info-circle me-1"></i> <code>{{M1}}</code> 〜 <code>{{M5}}</code>
+                            と入力すると、対応するマイルストーンの内容に自動置換されます。
                         </div>
                         <textarea v-model="announceModal.content" class="form-control" rows="10"
                             placeholder="告知の詳細内容を入力してください。Markdownが使用可能です。"></textarea>
@@ -656,9 +693,8 @@
                                     </td>
                                     <td>
                                         <span class="badge"
-                                            :class="ann.sent_at ? 'bg-secondary' : (new Date(ann.scheduled_at) > new Date('2090-01-01') ? 'bg-info' : 'bg-warning')">
-                                            {{ ann.sent_at ? '送信済み' : (new Date(ann.scheduled_at) > new
-                                            Date('2090-01-01') ? '下書き' : '予約中') }}
+                                            :class="ann.sent_at ? 'bg-secondary' : (ann.is_draft ? 'bg-info' : 'bg-warning')">
+                                            {{ ann.sent_at ? '送信済み' : (ann.is_draft ? '下書き' : '予約中') }}
                                         </span>
                                     </td>
                                     <td class="text-end">

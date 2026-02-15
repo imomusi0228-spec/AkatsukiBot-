@@ -1,6 +1,5 @@
 const { Client } = require('discord.js');
 const db = require('./db');
-require('dotenv').config();
 
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
 const ROLES = {
@@ -126,6 +125,7 @@ async function syncSubscriptions(client) {
                                 ).catch((err) => {
                                     console.error(`[Sync] Update failed for ${sId}:`, err.message);
                                 });
+                                console.log(`[Sync] Updated ${userName} (${sId}): Tier ${currentTier} -> ${tier}${needsNameUpdate ? ' (Name Updated)' : ''}`);
                                 updatedCount++;
                             } catch (err) {
                                 console.error(`[Sync] Failed to update row for user ${member.id}:`, err.message);

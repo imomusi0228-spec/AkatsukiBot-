@@ -87,8 +87,8 @@ router.post('/announce', authMiddleware, async (req, res) => {
 
         if (scheduled_at) {
             await db.query(
-                'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks) VALUES ($1, $2, $3, $4, $5)',
-                [processedTitle, processedContent, type || 'normal', scheduled_at, tasksJson]
+                'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks, is_draft) VALUES ($1, $2, $3, $4, $5, $6)',
+                [processedTitle, processedContent, type || 'normal', scheduled_at, tasksJson, false]
             );
             return res.json({ success: true, message: 'Announcement scheduled' });
         }
@@ -104,12 +104,17 @@ router.post('/announce', authMiddleware, async (req, res) => {
         }
 
         const embed = {
+            author: {
+                name: 'AkatsukiBot Update System',
+                icon_url: 'https://cdn.discordapp.com/emojis/1150654483737526312.png' // Custom emoji or icon
+            },
             title: processedTitle,
             description: processedContent,
-            color: type === 'important' ? 0xff0000 : 0x00ff00,
+            color: type === 'important' ? 0xff4c4c : 0x7aa2f7, // Tokyo Night style colors
             timestamp: new Date().toISOString(),
             footer: {
-                text: 'AkatsukiBot Update System'
+                text: `AkatsukiBot | Version ${require('../package.json').version}`,
+                icon_url: client.user.displayAvatarURL()
             }
         };
 
@@ -138,8 +143,8 @@ router.put('/announce/:id', authMiddleware, async (req, res) => {
         if (check.rows[0].sent_at) return res.status(400).json({ error: 'Already sent. Cannot edit.' });
 
         await db.query(
-            'UPDATE scheduled_announcements SET title = $1, content = $2, type = $3, scheduled_at = $4, associated_tasks = $5 WHERE id = $6',
-            [title, content, type, scheduled_at, JSON.stringify(associated_tasks || []), id]
+            'UPDATE scheduled_announcements SET title = $1, content = $2, type = $3, scheduled_at = $4, associated_tasks = $5, is_draft = $6 WHERE id = $7',
+            [title, content, type, scheduled_at, JSON.stringify(associated_tasks || []), false, id]
         );
         res.json({ success: true, message: 'Announcement updated' });
     } catch (err) {
@@ -174,17 +179,25 @@ router.post('/updates/receive', async (req, res) => {
     }
 
     try {
-        // 下書きとして保存 (2099年に設定して告知一覧の下の方、もしくは「下書き」として扱う)
-        const draftDate = new Date('2099-12-31T00:00:00');
         await db.query(
-            'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks) VALUES ($1, $2, $3, $4, $5)',
-            [title, content, 'normal', draftDate, JSON.stringify([])]
+            'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks, is_draft) VALUES ($1, $2, $3, $4, $5, $6)',
+            [title, content, 'normal', new Date(), JSON.stringify([]), true]
         );
 
         res.json({ success: true, message: 'Update draft received' });
     } catch (err) {
         console.error('[Updates] Failed to receive:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/version (ボットのバージョン取得)
+router.get('/version', (req, res) => {
+    try {
+        const pkg = require('../package.json');
+        res.json({ version: pkg.version });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to read version' });
     }
 });
 

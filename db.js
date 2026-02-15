@@ -1,5 +1,4 @@
 const { Pool } = require('pg');
-require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -13,10 +12,10 @@ async function initDB() {
   try {
     // 1. Initial Migrations (Legacy field normalization)
     // server_id -> guild_id, plan_tier -> tier
-    const tablesToCheck = ['subscriptions', 'license_keys', 'applications'];
-    for (const table of tablesToCheck) {
+    const allowedTables = ['subscriptions', 'license_keys', 'applications'];
+    for (const table of allowedTables) {
       try {
-        const colsRes = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}'`);
+        const colsRes = await client.query('SELECT column_name FROM information_schema.columns WHERE table_name = $1', [table]);
         const cols = colsRes.rows.map(r => r.column_name);
 
         if (cols.includes('server_id') && !cols.includes('guild_id')) {
@@ -113,6 +112,7 @@ async function initDB() {
         scheduled_at TIMESTAMP NOT NULL,
         sent_at TIMESTAMP,
         associated_tasks JSONB DEFAULT '[]',
+        is_draft BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       `
     };
@@ -129,7 +129,8 @@ async function initDB() {
         ['updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP']
       ],
       scheduled_announcements: [
-        ['associated_tasks', "JSONB DEFAULT '[]'"]
+        ['associated_tasks', "JSONB DEFAULT '[]'"],
+        ['is_draft', "BOOLEAN DEFAULT FALSE"]
       ],
       operation_logs: [
         ['target_name', 'VARCHAR(255)'],

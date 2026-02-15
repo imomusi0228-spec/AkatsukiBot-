@@ -298,6 +298,80 @@ createApp({
             new bootstrap.Modal(document.getElementById('appDetailsModal')).show();
         };
 
+        const applyTemplate = (type) => {
+            const version = stats.value.botVersion || 'v1.X.X';
+            const templates = {
+                update: {
+                    title: `【アップデート】AkatsukiBot ${version} 公開のお知らせ`,
+                    content: `## 🚀 アップデート情報 (${version})\n\nお嬢、ボットの最新バージョンを公開したよ。今回の主な変更点は以下の通りだ。\n\n### ✨ 新機能\n- \n- \n\n### 🔧 改善・修正\n- \n- \n\n今後もより使いやすくなるよう手を入れていくから、楽しみにしてな。`,
+                    type: 'normal'
+                },
+                maintenance: {
+                    title: `【メンテナンス】定期メンテナンス実施のお知らせ`,
+                    content: `## 🔧 メンテナンスのお知らせ\n\nお嬢、以下の日程で定期メンテナンスを実施するよ。メンテナンス中はボットの一部機能が利用できなくなるから注意してな。\n\n**📅 日時**\n202X年XX月XX日 XX:00 〜 XX:00\n\n**📝 内容**\n- サーバーの最適化\n- データベースのバックアップ`,
+                    type: 'important'
+                },
+                fix: {
+                    title: `【不具合修正】特定環境での動作不良に関する修正`,
+                    content: `## 🐞 不具合修正のお知らせ\n\n報告のあった以下の不具合を修正したよ。お嬢にはパニックをかけさせて悪かったね。\n\n**✅ 修正内容**\n- \n- \n\nもし他にも何か見つけたら、遠慮なく僕に言いなよ。`,
+                    type: 'normal'
+                },
+                milestone: {
+                    title: `【マイルストーン】新機能開放のお知らせ`,
+                    content: `## 📊 マイルストーン開放！\n\nお嬢、指定の期間が経過したから新しい機能が開放されたよ。\n\n現在の段階: {{M1}}\n次回開放予定: {{M2}}\n\n詳細は管理パネルから確認してな。`,
+                    type: 'normal'
+                }
+            };
+
+            const template = templates[type];
+            if (template) {
+                announceModal.title = template.title;
+                announceModal.content = template.content;
+                announceModal.type = template.type;
+            }
+        };
+
+        const fetchBotVersion = async () => {
+            try {
+                const res = await api('/version');
+                if (res.version) {
+                    stats.value.botVersion = res.version;
+                    // If title is currently a template or empty, update it
+                    if (!announceModal.title || announceModal.title.includes('v1.X.X')) {
+                        announceModal.title = announceModal.title.replace('v1.X.X', res.version);
+                    }
+                    if (announceModal.content.includes('v1.X.X')) {
+                        announceModal.content = announceModal.content.replace('v1.X.X', res.version);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch version:', e);
+            }
+        };
+
+        const insertText = (before, after = '') => {
+            const textarea = document.querySelector('textarea[v-model="announceModal.content"]');
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = announceModal.content;
+            const selection = text.substring(start, end);
+
+            const replacement = before + selection + after;
+            announceModal.content = text.substring(0, start) + replacement + text.substring(end);
+
+            // Re-focus and set cursor inside if wrapping
+            setTimeout(() => {
+                textarea.focus();
+                if (after) {
+                    textarea.setSelectionRange(start + before.length, end + before.length);
+                } else {
+                    textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+                }
+            }, 0);
+        };
+
         const sendAnnouncement = async () => {
             if (!announceModal.title || !announceModal.content) {
                 alert('タイトルと内容は必須やな');
@@ -542,7 +616,8 @@ createApp({
             loadData, changePage, search, showOverallPie,
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,
             toggleSelectAll, bulkDeactivate,
-            announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit, postNow
+            announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit, postNow,
+            applyTemplate, fetchBotVersion, insertText
         };
     }
 }).mount('#app');
