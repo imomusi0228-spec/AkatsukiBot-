@@ -12,7 +12,9 @@ const { syncSubscriptions } = require('./sync');
 const { startServer } = require('./server');
 const { startCron } = require('./services/cron');
 
-console.log('>>> Starting Bot Application...');
+console.log('==========================================');
+console.log('   Akatsuki Bot System - Starting Up...');
+console.log('==========================================');
 
 // 1. Initialize Discord Client
 const client = new Client({
