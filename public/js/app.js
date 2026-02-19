@@ -18,7 +18,9 @@ createApp({
         const applications = ref([]);
         const subPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
         const appPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
-        const logs = ref([]);
+        const auditLogs = ref([]);
+        const logPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
+        const logFilter = reactive({ search: '', action: '' });
         const blacklist = ref([]);
         const settings = ref({ webhook_url: '' });
         const detailedStats = ref({
@@ -211,12 +213,6 @@ createApp({
             editModal.extendDuration = 1;
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             modal.show();
-        };
-
-        const generateHeatmap = () => {
-            // In a real scenario, we'd fetch actual daily activity counts from operation_logs
-            // For now, let's look at logs we already have or just show the placeholder
-            // If we want real data, we'd need a specific endpoint to aggregate logs per day
         };
 
         const saveEdit = async () => {
@@ -444,6 +440,19 @@ createApp({
             }
         };
 
+        watch(activeTab, (newTab) => {
+            if (newTab === 'stats') {
+                setTimeout(() => {
+                    initGrowthChart();
+                    generateHeatmap();
+                }, 300);
+            }
+        });
+
+        const generateHeatmap = () => {
+            // Heatmap logic is handled via detailedStats.heatmap_data which is fetched in loadData
+        };
+
         const removeFromBlacklist = async (id) => {
             if (!confirm(`ターゲット ${id} をブラックリストから解除しますか？`)) return;
             const res = await api(`/blacklist/${id}`, 'DELETE');
@@ -521,15 +530,6 @@ createApp({
                 isImporting.value = false;
             }
         };
-
-        watch(activeTab, (newTab) => {
-            if (newTab === 'stats') {
-                setTimeout(() => {
-                    initGrowthChart();
-                    generateHeatmap();
-                }, 300);
-            }
-        });
 
         const initGrowthChart = () => {
             const ctx = document.getElementById('growthChart')?.getContext('2d');
