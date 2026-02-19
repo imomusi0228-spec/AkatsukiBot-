@@ -14,6 +14,19 @@ router.get('/', authMiddleware, async (req, res) => {
         let params = [];
         let whereClause = [];
 
+        // Tier-based retention limiting
+        // Skip check if it's Admin (via Authorization header check in middleware usually sets req.user to null but passes)
+        // If req.user exists, apply tier limits
+        if (req.user) {
+            const tier = req.user.tier;
+            if (tier === 'Pro' || tier === '1') {
+                whereClause.push("created_at >= NOW() - INTERVAL '7 days'");
+            } else if (tier === 'Pro+' || tier === '3') {
+                whereClause.push("created_at >= NOW() - INTERVAL '30 days'");
+            }
+            // Pro+ above or specific admin allowed to see all/more would go here
+        }
+
         if (search) {
             params.push(`%${search}%`);
             whereClause.push(`(target_id ILIKE $${params.length} OR target_name ILIKE $${params.length} OR details ILIKE $${params.length} OR operator_name ILIKE $${params.length})`);

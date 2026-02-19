@@ -185,6 +185,17 @@ function startCron(client) {
         } catch (err) {
             console.error('[Cron] Error processing milestone auto-unlock:', err);
         }
+
+        // --- NEW: Handle Automatic Update Check (GitHub) ---
+        // Run daily at 3:00 AM
+        if (now.getHours() === 3 && now.getMinutes() === 0) {
+            try {
+                const { checkForUpdates } = require('./updates');
+                await checkForUpdates(client);
+            } catch (err) {
+                console.error('[Cron] Error checking for updates:', err);
+            }
+        }
     });
 }
 

@@ -126,6 +126,14 @@
                         <button class="nav-link" :class="{ active: activeTab === 'announce' }"
                             @click="activeTab = 'announce'">告知作成</button>
                     </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeTab === 'blacklist' }"
+                            @click="activeTab = 'blacklist'">ブラックリスト</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeTab === 'import' }"
+                            @click="activeTab = 'import'">インポート</button>
+                    </li>
 
                 </ul>
 
@@ -431,11 +439,30 @@
                     </div>
 
                     <!-- Growth Chart -->
-                    <div class="col-12 mt-4">
+                    <div class="col-md-8 mt-4">
                         <div class="panel">
                             <h5 class="mb-4">月別新規契約推移 (有料プランのみ)</h5>
                             <div style="height: 300px;">
                                 <canvas id="growthChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Heatmap placeholder -->
+                    <div class="col-md-4 mt-4">
+                        <div class="panel h-100">
+                            <h5 class="mb-4 text-warning"><i class="bi bi-grid-3x3-gap me-2"></i>アクティビティヒートマップ</h5>
+                            <div class="d-flex flex-column align-items-center justify-content-center h-100 pb-5">
+                                <div id="vcHeatmap" class="d-flex flex-wrap gap-1" style="width: 210px;">
+                                    <div v-for="day in detailedStats.heatmap_data" :key="day.date" class="rounded-1"
+                                        :style="{ 
+                                            width: '20px', 
+                                            height: '20px', 
+                                            background: 'rgba(122, 162, 247, ' + Math.min(0.2 + (day.count * 0.2), 1) + ')',
+                                            border: day.count > 0 ? '1px solid rgba(255,255,255,0.2)' : 'none'
+                                         }" :title="day.date + ': ' + day.count + ' activities'"></div>
+                                </div>
+                                <div class="mt-3 small text-muted">過去28日間の操作アクティビティ</div>
                             </div>
                         </div>
                     </div>
@@ -536,6 +563,100 @@
                 </nav>
             </div>
 
+            <!-- Tab Content: Blacklist -->
+            <div v-if="activeTab === 'blacklist'" class="px-3">
+                <div class="panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-person-x me-2"></i>ブラックリスト管理</h4>
+                        <button class="btn btn-danger" @click="openBlacklistModal">
+                            <i class="bi bi-plus-lg"></i> 手動追加
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Target ID</th>
+                                    <th>Type</th>
+                                    <th>Reason</th>
+                                    <th>Created At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="bl in blacklist" :key="bl.target_id">
+                                    <td><code>{{ bl.target_id }}</code></td>
+                                    <td><span class="badge" :class="bl.type === 'user' ? 'bg-primary' : 'bg-warning'">{{
+                                            bl.type }}</span></td>
+                                    <td>{{ bl.reason || 'No reason' }}</td>
+                                    <td>{{ new Date(bl.created_at).toLocaleString() }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-success"
+                                            @click="removeFromBlacklist(bl.target_id)">
+                                            <i class="bi bi-unlock"></i> 解除
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="blacklist.length === 0">
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        ブラックリストに登録されているユーザーやサーバーはありません。
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Import -->
+            <div v-if="activeTab === 'import'" class="px-3">
+                <div class="panel p-4" style="max-width: 800px; margin: 0 auto;">
+                    <h4 class="mb-4"><i class="bi bi-file-earmark-arrow-up me-2"></i>BOOTHデータインポート</h4>
+                    <div class="alert alert-info border-0 rounded-4 p-3 mb-4">
+                        <i class="bi bi-info-circle me-2"></i>
+                        BOOTHからダウンロードした「注文リストCSV」をそのままアップロードできるよ。
+                        注文番号が自動的にライセンスキーとして登録されるから、手動で発行する手間が省けるね。
+                    </div>
+
+                    <div class="mb-4 p-5 border border-dashed border-secondary rounded-4 text-center" @dragover.prevent
+                        @drop.prevent="handleCsvDrop"
+                        style="border-style: dashed !important; background: rgba(255,255,255,0.02);">
+                        <i class="bi bi-cloud-upload display-1 text-accent mb-3"></i>
+                        <h5>ここにCSVファイルをドラッグ＆ドロップ</h5>
+                        <p class="text-muted">または下のボタンから選択してね</p>
+                        <input type="file" id="csvFile" class="d-none" accept=".csv" @change="handleCsvSelect">
+                        <label for="csvFile" class="btn btn-outline-accent">ファイルを選択</label>
+                    </div>
+
+                    <div v-if="importPreview.length > 0" class="mt-4">
+                        <h6>インポートプレビュー (先頭3件)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>注文番号</th>
+                                        <th>ティア</th>
+                                        <th>期間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(row, idx) in importPreview.slice(0, 3)" :key="idx">
+                                        <td>{{ row.order_id }}</td>
+                                        <td>{{ row.tier }}</td>
+                                        <td>{{ row.duration }}ヶ月</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-primary w-100 mt-2" @click="executeImport" :disabled="isImporting">
+                            <span v-if="isImporting" class="spinner-border spinner-border-sm me-2"></span>
+                            {{ importPreview.length }} 件のデータを登録実行
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tab Content: Settings -->
             <div v-if="activeTab === 'settings'" class="px-3">
                 <div class="panel p-4" style="max-width: 800px; margin: 0 auto;">
@@ -543,7 +664,12 @@
 
                     <div class="mb-4">
                         <label class="form-label text-accent d-flex justify-content-between">
-                            Discord Webhook URL
+                            <span>
+                                Discord Webhook URL
+                                <span class="ms-1 cursor-help"
+                                    title="申請の承認や、設定の変更などのログをDiscordのチャンネルに通知するためのURLだよ。 Discordのチャンネル設定から作成してね。"
+                                    style="font-size: 0.8em; opacity: 0.7;">?</span>
+                            </span>
                             <span v-if="settings.webhook_url" class="badge bg-success">設定済み</span>
                             <span v-else class="badge bg-secondary">未設定</span>
                         </label>
@@ -559,6 +685,18 @@
                         </div>
                         <div class="form-text text-muted mt-2">
                             申請の承認やアクションのログをDiscordへ送信します。
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-accent">
+                            自動承認モード
+                            <span class="ms-1 cursor-help" title="オンにすると、有効なライセンスキーが申請された際に自動的にロール付与などの処理を行うよ。現在は開発中..."
+                                style="font-size: 0.8em; opacity: 0.7;">?</span>
+                        </label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" disabled>
+                            <label class="form-check-label text-muted">自動承認を有効にする (Coming Soon)</label>
                         </div>
                     </div>
 

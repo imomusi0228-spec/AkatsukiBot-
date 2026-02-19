@@ -51,6 +51,8 @@ const routes = [
     { path: '/api/applications', module: 'applications' },
     { path: '/api/settings', module: 'settings' },
     { path: '/api/logs', module: 'logs' },
+    { path: '/api/blacklist', module: 'blacklist' },
+    { path: '/api/import', module: 'import' },
     { path: '/api', module: 'misc' }
 ];
 

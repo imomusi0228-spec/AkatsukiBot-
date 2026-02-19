@@ -13,7 +13,10 @@ const adminCommands = [
     new SlashCommandBuilder()
         .setName('setup_application')
         .setDescription('ライセンス申請パネルを設置します')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('move')
+        .setDescription('現在のサーバーのライセンスを解除し、別のサーバーへ移動する準備をします')
 ];
 
 const publicCommands = [
@@ -93,7 +96,27 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    if (['sync', 'activate', 'setup_vc', 'setup_application'].includes(interaction.commandName)) {
+    // Admin commands authorization check
+    const isAdminCommand = adminCommands.some(cmd => cmd.name === interaction.commandName);
+    if (isAdminCommand) {
+        const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
+        const isExplicitAdmin = allowedIds.includes(interaction.user.id);
+        const hasDiscordAdmin = interaction.member && interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+        if (!isExplicitAdmin && !hasDiscordAdmin) {
+            return interaction.reply({ content: '❌ このコマンドを実行する権限がありません。', flags: MessageFlags.Ephemeral });
+        }
+    }
+
+    // Blacklist check for ALL interaction commands
+    try {
+        const blCheck = await require('./db').query('SELECT 1 FROM blacklist WHERE target_id = $1', [interaction.user.id]);
+        if (blCheck.rows.length > 0) {
+            return interaction.reply({ content: '❌ あなたはブラックリストに登録されているため、ボットの機能を利用できません。', flags: MessageFlags.Ephemeral });
+        }
+    } catch (e) { }
+
+    if (['sync', 'activate', 'setup_vc', 'setup_application', 'move'].includes(interaction.commandName)) {
         try {
             const commandHandler = require(`./subcommands/${interaction.commandName}`);
             await commandHandler(interaction);

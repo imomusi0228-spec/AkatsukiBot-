@@ -24,6 +24,7 @@ async function main() {
     console.log('5. DM送信テスト (manual_dm.js)');
     console.log('6. クロンジョブの強制実行 (force_cron_run.js)');
     console.log('7. DM送信状況の確認 (check_dm_status.js)');
+    console.log('8. アップデート情報の強制取得 (check_updates)');
     console.log('0. 終了');
     console.log('------------------------------------------');
 
@@ -49,6 +50,9 @@ async function main() {
                 break;
             case '7':
                 await checkDMStatus();
+                break;
+            case '8':
+                await manualUpdateCheck();
                 break;
             case '0':
                 console.log('さようなら、お嬢。');
@@ -254,6 +258,21 @@ async function checkDMStatus() {
         });
     } catch (err) {
         console.error('[Status] エラー:', err.message);
+    }
+}
+
+
+// --- アップデート強制取得 ---
+async function manualUpdateCheck() {
+    const { checkForUpdates } = require('../services/updates');
+    console.log('[Updates] 手動チェックを開始します...');
+    const result = await checkForUpdates(null); // clientは通知がなければnullでも可
+    if (result.created) {
+        console.log(`[Updates] 新しいバージョン (${result.newVersion}) の告知ドラフトを作成しました。`);
+    } else if (result.newVersion) {
+        console.log(`[Updates] 最新バージョン (${result.newVersion}) は既にチェック済み、または更新はありません。`);
+    } else {
+        console.log('[Updates] チェックに失敗しました。詳細なログを確認してください。');
     }
 }
 

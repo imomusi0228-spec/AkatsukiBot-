@@ -88,6 +88,13 @@ module.exports = async (interaction) => {
         const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
         const existingSubs = existingResult.rows;
 
+        // Check migration availability if this is a reactivation
+        const conflictRes = await db.query('SELECT * FROM subscriptions WHERE guild_id = $1', [guildId]);
+        if (conflictRes.rows.length > 0 && !conflictRes.rows[0].is_active) {
+            // This is a reactivation of a previously moved/deactivated sub
+            // We allow it if they just moved it here
+        }
+
         const isCurrentServerRegistered = existingSubs.some(s => s.guild_id === guildId);
 
         if (!isCurrentServerRegistered) {
@@ -105,7 +112,7 @@ module.exports = async (interaction) => {
 
             if (existingSubs.length >= maxLimit) {
                 return interaction.editReply({
-                    content: `❌ **登録制限エラー**\nお使いのプラン (${hasProPlus ? 'Pro+' : 'Pro'}) では最大 ${maxLimit} サーバーまで登録可能です。\n現在の登録数: ${existingSubs.length}`
+                    content: `❌ **登録制限エラー**\nお使いのプラン (${hasProPlus ? 'Pro+' : 'Pro'}) では最大 ${maxLimit} サーバーまで登録可能です。\n現在の登録数: ${existingSubs.length}\n別のサーバーから移動する場合は、旧サーバーで \`/move\` を実行してください。`
                 });
             }
         }
@@ -119,13 +126,14 @@ module.exports = async (interaction) => {
         }
 
         await db.query(`
-            INSERT INTO subscriptions (guild_id, user_id, tier, expiry_date, is_active)
-            VALUES ($1, $2, $3, $4, TRUE)
+            INSERT INTO subscriptions (guild_id, user_id, tier, expiry_date, is_active, updated_at)
+            VALUES ($1, $2, $3, $4, TRUE, NOW())
             ON CONFLICT (guild_id) DO UPDATE 
             SET user_id = EXCLUDED.user_id, 
                 tier = EXCLUDED.tier, 
                 expiry_date = EXCLUDED.expiry_date, 
-                is_active = TRUE
+                is_active = TRUE,
+                updated_at = NOW()
         `, [guildId, userId, tier, exp]).catch(err => {
             console.error('[Activate] Insert failed:', err);
             throw err;

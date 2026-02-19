@@ -199,6 +199,33 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
         `);
         stats.growth_data = growthRes.rows;
 
+        // Daily Activity for Heatmap (Last 28 days)
+        const activityRes = await db.query(`
+            SELECT 
+                TO_CHAR(created_at, 'YYYY-MM-DD') as day,
+                COUNT(*) as count
+            FROM operation_logs
+            WHERE created_at >= NOW() - INTERVAL '28 days'
+            GROUP BY day
+            ORDER BY day ASC
+        `);
+
+        // Map to a 28-day array
+        const activityMap = {};
+        activityRes.rows.forEach(r => activityMap[r.day] = parseInt(r.count));
+
+        const heatmapData = [];
+        for (let i = 27; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            heatmapData.push({
+                date: dateStr,
+                count: activityMap[dateStr] || 0
+            });
+        }
+        stats.heatmap_data = heatmapData;
+
         res.json(stats);
     } catch (err) {
         res.status(500).json({ error: err.message });

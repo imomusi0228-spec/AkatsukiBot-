@@ -18,16 +18,19 @@ createApp({
         const applications = ref([]);
         const subPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
         const appPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
-        const auditLogs = ref([]);
-        const logPagination = ref({ total: 0, page: 1, pages: 1, limit: 50 });
-        const logFilter = reactive({ search: '', action: '' });
+        const logs = ref([]);
+        const blacklist = ref([]);
         const settings = ref({ webhook_url: '' });
-        const selectedSubs = ref([]);
         const detailedStats = ref({
             tier_distribution: { paid: {}, trial: {}, overall: {} },
             retention_rate: 0,
-            growth_data: []
+            growth_data: [],
+            heatmap_data: []
         });
+        const selectedSubs = ref([]);
+
+        const importPreview = ref([]);
+        const isImporting = ref(false);
         // Filters & Search
         const searchQuery = ref('');
         const filterStatus = ref('all'); // all, active, expired, expiring
@@ -86,18 +89,20 @@ createApp({
             // but for full scalability, we'd add &status= filter to API.
             // For now, let's just use the search param.
 
-            const [sRes, aRes, stData, setsRes, dsData] = await Promise.all([
+            const [sRes, aRes, stData, setsRes, dsData, blRes] = await Promise.all([
                 api(`/subscriptions${subQuery}`),
                 api(`/applications?page=${appPagination.value.page}&limit=${appPagination.value.limit}`),
                 api('/subscriptions/stats'),
                 api('/settings'),
-                api('/subscriptions/stats/detailed')
+                api('/subscriptions/stats/detailed'),
+                api('/blacklist')
             ]);
 
             subscriptions.value = sRes.data || [];
             subPagination.value = sRes.pagination || subPagination.value;
 
             applications.value = aRes.data || [];
+            blacklist.value = blRes || [];
             appPagination.value = aRes.pagination || appPagination.value;
 
             stats.value = stData || {};
@@ -206,6 +211,12 @@ createApp({
             editModal.extendDuration = 1;
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             modal.show();
+        };
+
+        const generateHeatmap = () => {
+            // In a real scenario, we'd fetch actual daily activity counts from operation_logs
+            // For now, let's look at logs we already have or just show the placeholder
+            // If we want real data, we'd need a specific endpoint to aggregate logs per day
         };
 
         const saveEdit = async () => {
@@ -433,9 +444,90 @@ createApp({
             }
         };
 
+        const removeFromBlacklist = async (id) => {
+            if (!confirm(`ターゲット ${id} をブラックリストから解除しますか？`)) return;
+            const res = await api(`/blacklist/${id}`, 'DELETE');
+            if (res) {
+                blacklist.value = blacklist.value.filter(b => b.target_id !== id);
+                alert('解除しました');
+            }
+        };
+
+        const openBlacklistModal = () => {
+            const id = prompt('ブラックリストに追加するターゲットID (User ID or Guild ID) を入力してください:');
+            if (!id) return;
+            const type = prompt('タイプを入力してください (user/guild):', 'user');
+            if (!type) return;
+            const reason = prompt('理由を入力してください (オプション):');
+
+            api('/blacklist', 'POST', { target_id: id, type, reason }).then(res => {
+                if (res) {
+                    alert('追加しました');
+                    loadData();
+                }
+            });
+        };
+
+        const handleCsvDrop = (e) => {
+            const file = e.dataTransfer.files[0];
+            if (file) processCsv(file);
+        };
+
+        const handleCsvSelect = (e) => {
+            const file = e.target.files[0];
+            if (file) processCsv(file);
+        };
+
+        const processCsv = (file) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                const header = rows[0].split(',');
+                const orderIdx = header.findIndex(h => h.includes('注文番号') || h.includes('Order ID'));
+                const prodIdx = header.findIndex(h => h.includes('商品名') || h.includes('Product'));
+
+                const results = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const cols = rows[i].split(',');
+                    if (cols.length < 2) continue;
+
+                    const orderId = cols[orderIdx]?.replace(/"/g, '').trim();
+                    const prodName = cols[prodIdx]?.replace(/"/g, '').trim() || '';
+
+                    if (orderId) {
+                        results.push({
+                            order_id: orderId,
+                            tier: prodName.includes('Pro+') ? 'Pro+' : 'Pro',
+                            duration: prodName.includes('年') || prodName.includes('Year') ? 12 : 1
+                        });
+                    }
+                }
+                importPreview.value = results;
+            };
+            reader.readAsText(file);
+        };
+
+        const executeImport = async () => {
+            isImporting.value = true;
+            try {
+                const res = await api('/import/booth', 'POST', { data: importPreview.value });
+                if (res) {
+                    alert(`インポート完了！\n成功: ${res.imported}件\nスキップ: ${res.skipped}件`);
+                    importPreview.value = [];
+                    loadData();
+                }
+            } finally {
+                isImporting.value = false;
+            }
+        };
+
         watch(activeTab, (newTab) => {
             if (newTab === 'stats') {
-                setTimeout(initGrowthChart, 300);
+                setTimeout(() => {
+                    initGrowthChart();
+                    generateHeatmap();
+                }, 300);
             }
         });
 
@@ -612,7 +704,8 @@ createApp({
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,
             toggleSelectAll, bulkDeactivate,
             announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit, postNow,
-            applyTemplate, fetchBotVersion, insertText
+            applyTemplate, fetchBotVersion, insertText,
+            blacklist, removeFromBlacklist, openBlacklistModal, handleCsvDrop, handleCsvSelect, executeImport, importPreview, isImporting
         };
     }
 }).mount('#app');

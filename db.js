@@ -114,6 +114,13 @@ async function initDB() {
         associated_tasks JSONB DEFAULT '[]',
         is_draft BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
+      blacklist: `
+        target_id VARCHAR(255) PRIMARY KEY,
+        type VARCHAR(50) NOT NULL, -- 'user' or 'guild'
+        reason TEXT,
+        operator_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       `
     };
 
@@ -126,7 +133,9 @@ async function initDB() {
       subscriptions: [
         ['current_milestone', 'INTEGER DEFAULT 5'],
         ['auto_unlock_enabled', 'BOOLEAN DEFAULT FALSE'],
-        ['updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP']
+        ['updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+        ['migration_count', 'INTEGER DEFAULT 0'],
+        ['last_migration_at', 'TIMESTAMP']
       ],
       scheduled_announcements: [
         ['associated_tasks', "JSONB DEFAULT '[]'"],
