@@ -50,6 +50,11 @@ client.once(Events.ClientReady, async () => {
 
     runBackgroundTasks();
     startCron(client); // Start Cron Scheduler
+
+    // Check for updates/announcements on startup
+    const { checkForUpdates } = require('./services/updates');
+    checkForUpdates(client);
+
     setInterval(runBackgroundTasks, 3600000); // Sync roles every hour
 });
 
