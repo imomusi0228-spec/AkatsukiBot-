@@ -33,7 +33,7 @@ const history = [
         version: 'v1.8.0',
         date: '2026/02/19',
         title: '純粋進化',
-        content: `**[System]** 内部構造の再編により、応答速度とシステムの安定性をさらに向上\n**[Optimization]** データベース通信の効率化により、インフラ負荷を低減\n**[Automation]** マイルストーン制約の撤廃`
+        content: `**[System]** 内部構造の再編により、応答速度とシステムの安定性をさらに向上\n**[Optimization]** データベース通信の効率化により、インフラ負荷を低減`
     }
 ];
 
