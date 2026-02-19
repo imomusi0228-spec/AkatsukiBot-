@@ -32,6 +32,23 @@ const publicCommands = [
 const commands = [...adminCommands, ...publicCommands];
 
 async function handleInteraction(interaction) {
+    // 1. Blacklist check for ALL interaction types (User and Guild)
+    try {
+        const blCheck = await require('./db').query(
+            'SELECT 1 FROM blacklist WHERE target_id = $1 OR target_id = $2',
+            [interaction.user.id, interaction.guildId]
+        );
+        if (blCheck.rows.length > 0) {
+            const msg = '❌ あなた、またはこのサーバーはブラックリストに登録されているため、ボットの機能を利用できません。';
+            if (interaction.replied || interaction.deferred) {
+                return interaction.followUp({ content: msg, flags: MessageFlags.Ephemeral });
+            }
+            return interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+        }
+    } catch (e) {
+        console.error('Blacklist check error:', e);
+    }
+
     if (interaction.isButton()) {
         if (interaction.customId === 'create_support_vc') {
             await handleSupportVCButton(interaction);
@@ -107,14 +124,6 @@ async function handleInteraction(interaction) {
             return interaction.reply({ content: '❌ このコマンドを実行する権限がありません。', flags: MessageFlags.Ephemeral });
         }
     }
-
-    // Blacklist check for ALL interaction commands
-    try {
-        const blCheck = await require('./db').query('SELECT 1 FROM blacklist WHERE target_id = $1', [interaction.user.id]);
-        if (blCheck.rows.length > 0) {
-            return interaction.reply({ content: '❌ あなたはブラックリストに登録されているため、ボットの機能を利用できません。', flags: MessageFlags.Ephemeral });
-        }
-    } catch (e) { }
 
     if (['sync', 'activate', 'setup_vc', 'setup_application', 'move'].includes(interaction.commandName)) {
         try {
