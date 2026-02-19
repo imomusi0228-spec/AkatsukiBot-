@@ -235,19 +235,15 @@ createApp({
             loadData();
         }
 
-        const updateMilestone = async () => {
+        const updateTier = async () => {
             const gId = editModal.data.guild_id;
-            const res = await api(`/subscriptions/${gId}/milestone`, 'PATCH', {
-                current_milestone: parseInt(editModal.data.current_milestone),
-                auto_unlock_enabled: editModal.data.auto_unlock_enabled
+            await api(`/subscriptions/${gId}`, 'PUT', {
+                action: 'update_tier',
+                tier: editModal.data.tier
             });
-            if (res.success) {
-                // Keep local state or reload
-                loadData();
-            } else {
-                alert('マイルストーンの更新に失敗しました: ' + (res.error || 'Unknown error'));
-            }
-        };
+            alert('プランを更新しました');
+            loadData();
+        }
 
         const createSub = async () => {
             if (!addModal.data.guild_id || !addModal.data.user_id) {
@@ -310,7 +306,7 @@ createApp({
             const templates = {
                 update: {
                     title: `【アップデート】AkatsukiBot ${version} 公開のお知らせ`,
-                    content: `## 🚀 アップデート情報 (${version})\n\nAkatsukiBotの最新バージョンを公開しました。今回の主な変更点は以下の通りです。\n\n### ✨ 新機能\n- \n- \n\n### 🔧 改善・修正\n- \n- \n\n### 📊 マイルストーン進捗\n現在の段階: {{M1}}\n次回開放予定: {{M2}}\n\n今後もより使いやすくなるよう改善を続けてまいります。ぜひご活用ください。`,
+                    content: `## 🚀 アップデート情報 (${version})\n\nAkatsukiBotの最新バージョンを公開しました。今回の主な変更点は以下の通りです。\n\n### ✨ 新機能\n- \n- \n\n### 🔧 改善・修正\n- \n- \n\n今後もより使いやすくなるよう改善を続けてまいります。ぜひご活用ください。`,
                     type: 'normal'
                 },
                 maintenance: {
@@ -631,7 +627,7 @@ createApp({
         // Modal States (Restored)
         const editModal = reactive({
             show: false,
-            data: { guild_id: '', tier: 'Pro', expiry_date: null, auto_renew: false, current_milestone: 1, auto_unlock_enabled: false },
+            data: { guild_id: '', tier: 'Pro', expiry_date: null, auto_renew: false },
             extendDuration: 1,
             extendUnit: 'm'
         });
@@ -708,7 +704,7 @@ createApp({
             searchQuery, filterStatus, settings, selectedSubs,
             editModal, addModal, keyModal, appDetailsModal,
             formatDate, deactivateSub, resumeSub, hardDeleteSub, toggleAutoRenew, copyText,
-            openEditModal, saveEdit, updateTier, createSub, updateMilestone,
+            openEditModal, saveEdit, updateTier, createSub,
             approveApp, deleteApp, openAppDetails, loginWithToken, logout,
             loadData, changePage, search, showOverallPie,
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,

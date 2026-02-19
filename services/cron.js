@@ -153,37 +153,10 @@ function startCron(client) {
                     await channel.send({ embeds: [embed] });
                     await db.query('UPDATE scheduled_announcements SET sent_at = NOW() WHERE id = $1', [announce.id]);
                     console.log(`[Cron] Posted scheduled announcement: ${announce.title}`);
-
-                    // Execute associated tasks
-                    const { executeAnnouncementTasks } = require('../routes/misc');
-                    if (announce.associated_tasks && Array.isArray(announce.associated_tasks)) {
-                        executeAnnouncementTasks(client, announce.associated_tasks);
-                    }
                 }
             }
         } catch (err) {
             console.error('[Cron] Error processing scheduled announcements:', err);
-        }
-
-        // --- NEW: Handle Milestone Auto-Unlock ---
-        try {
-            // Find subscriptions with auto_unlock enabled that haven't reached M5 (max)
-            // and where it's been at least 7 days since the last update
-            const milestoneRes = await db.query(`
-                SELECT guild_id, current_milestone 
-                FROM subscriptions 
-                WHERE auto_unlock_enabled = TRUE 
-                AND current_milestone < 5 
-                AND updated_at <= NOW() - INTERVAL '7 days'
-            `);
-
-            for (const sub of milestoneRes.rows) {
-                const nextM = (sub.current_milestone || 0) + 1;
-                await db.query('UPDATE subscriptions SET current_milestone = $1, updated_at = NOW() WHERE guild_id = $2', [nextM, sub.guild_id]);
-                console.log(`[Cron] Auto-unlocked milestone M${nextM} for guild ${sub.guild_id}`);
-            }
-        } catch (err) {
-            console.error('[Cron] Error processing milestone auto-unlock:', err);
         }
 
         // --- NEW: Handle Automatic Update Check (GitHub) ---

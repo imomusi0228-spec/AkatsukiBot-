@@ -757,8 +757,7 @@
                             </div>
                         </label>
                         <div class="form-text text-muted mb-2">
-                            <i class="bi bi-info-circle me-1"></i> <code>{{M1}}</code> 〜 <code>{{M5}}</code>
-                            と入力すると、対応するマイルストーンの内容に自動置換されます。
+                            <i class="bi bi-info-circle me-1"></i> Markdownが使用可能です。
                         </div>
                         <textarea v-model="announceModal.content" class="form-control" rows="10"
                             placeholder="告知の詳細内容を入力してください。Markdownが使用可能です。"></textarea>
@@ -780,11 +779,6 @@
                                 <input class="form-check-input" type="checkbox" value="sync_subs"
                                     v-model="announceModal.associated_tasks" id="task_sync">
                                 <label class="form-check-label" for="task_sync">サブスク同期</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" value="milestone_check"
-                                    v-model="announceModal.associated_tasks" id="task_milestone">
-                                <label class="form-check-label" for="task_milestone">マイルストーン一括チェック</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="cleanup_logs"
@@ -873,31 +867,6 @@
                                         <option value="Pro+">Pro+ (プロプラス)</option>
                                     </select>
                                     <button class="btn btn-outline-primary" @click="updateTier">変更保存</button>
-                                </div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="form-label text-accent fw-bold"><i
-                                        class="bi bi-rocket-takeoff me-1"></i>マイルストーン管理</label>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <label class="small text-muted mb-1">現在の階層</label>
-                                        <select v-model="editModal.data.current_milestone"
-                                            class="form-select form-select-sm" @change="updateMilestone">
-                                            <option :value="1">M1: 登録 & VC基本</option>
-                                            <option :value="2">M2: 多言語 & 監査</option>
-                                            <option :value="3">M3: 分析 & データ</option>
-                                            <option :value="4">M4: 高度なセキュリティ</option>
-                                            <option :value="5">M5: すべて開放</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-6 d-flex align-items-end pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox"
-                                                v-model="editModal.data.auto_unlock_enabled" @change="updateMilestone">
-                                            <label class="form-check-label small">1週間ごとに自動開放</label>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 

@@ -53,7 +53,6 @@ async function checkForUpdates(client) {
 
             const channel = await client.channels.fetch(channelId).catch(() => null);
             if (channel) {
-                const { replaceMilestonePlaceholders } = require('./milestones');
                 const title = `🚀 【アップデート】AkatsukiBot v${currentVersion} 公開のお知らせ`;
 
                 // Construct public-only content (Filtering internal info)
@@ -63,14 +62,10 @@ AkatsukiBotが新しくなりました！今回の主な変更点は以下の通
 
 ${releaseNote}
 
-### 📊 マイルストーン進捗
-現在の段階: {{M1}}
-次回開放予定: {{M2}}
-
 今後もより使いやすくなるよう改善を続けてまいります。ぜひご活用ください。`;
 
-                const processedTitle = replaceMilestonePlaceholders(title);
-                const processedContent = replaceMilestonePlaceholders(publicContent);
+                const processedTitle = title;
+                const processedContent = publicContent;
 
                 const embed = new EmbedBuilder()
                     .setAuthor({

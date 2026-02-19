@@ -47,8 +47,7 @@ async function initDB() {
         valid_until TIMESTAMP,
         cached_username VARCHAR(255),
         cached_servername VARCHAR(255),
-        current_milestone INTEGER DEFAULT 5,
-        auto_unlock_enabled BOOLEAN DEFAULT FALSE,
+        cached_servername VARCHAR(255),
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       `,
@@ -131,8 +130,6 @@ async function initDB() {
     // 3. Ensure Columns (Handle additions for existing tables)
     const essentialColumns = {
       subscriptions: [
-        ['current_milestone', 'INTEGER DEFAULT 5'],
-        ['auto_unlock_enabled', 'BOOLEAN DEFAULT FALSE'],
         ['updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
         ['migration_count', 'INTEGER DEFAULT 0'],
         ['last_migration_at', 'TIMESTAMP']

@@ -17,20 +17,6 @@ async function executeAnnouncementTasks(client, tasks) {
             if (task === 'sync_subs') {
                 console.log('[Announce Tasks] Running syncSubscriptions...');
                 await syncSubscriptions(client);
-            } else if (task === 'milestone_check') {
-                console.log('[Announce Tasks] Running milestone manual check...');
-                // Trigger milestone check for all eligible subs immediately
-                const res = await db.query(`
-                    SELECT guild_id, current_milestone 
-                    FROM subscriptions 
-                    WHERE auto_unlock_enabled = TRUE 
-                    AND current_milestone < 5 
-                    AND updated_at <= NOW() - INTERVAL '7 days'
-                `);
-                for (const sub of res.rows) {
-                    const nextM = (sub.current_milestone || 0) + 1;
-                    await db.query('UPDATE subscriptions SET current_milestone = $1, updated_at = NOW() WHERE guild_id = $2', [nextM, sub.guild_id]);
-                }
             } else if (task === 'cleanup_logs') {
                 console.log('[Announce Tasks] Cleaning up old logs...');
                 await db.query("DELETE FROM operation_logs WHERE created_at < NOW() - INTERVAL '30 days'");
@@ -81,9 +67,8 @@ router.post('/announce', authMiddleware, async (req, res) => {
 
     try {
         const tasksJson = JSON.stringify(associated_tasks || []);
-        const { replaceMilestonePlaceholders } = require('../services/milestones');
-        const processedTitle = replaceMilestonePlaceholders(title);
-        const processedContent = replaceMilestonePlaceholders(content);
+        const processedTitle = title;
+        const processedContent = content;
 
         if (scheduled_at) {
             await db.query(
