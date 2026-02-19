@@ -52,27 +52,36 @@ client.once('ready', async () => {
             process.exit(1);
         }
 
+        console.log(`Cleaning up old messages in: ${channel.name}`);
+
+        // Delete previous bot messages to avoid duplicates during this restyle
+        try {
+            const messages = await channel.messages.fetch({ limit: 20 });
+            const botMessages = messages.filter(m => m.author.id === client.user.id);
+            if (botMessages.size > 0) {
+                console.log(`Deleting ${botMessages.size} old messages...`);
+                await channel.bulkDelete(botMessages);
+            }
+        } catch (err) {
+            console.error('Failed to bulk delete (messages might be too old), trying manual delete...');
+            // Fallback if bulk delete fails
+        }
+
         console.log(`Posting history to channel: ${channel.name}`);
 
         for (const item of history) {
             const embed = new EmbedBuilder()
-                .setAuthor({
-                    name: 'AkatsukiBot History Archives',
-                    iconURL: 'https://cdn.discordapp.com/emojis/1150654483737526312.png'
-                })
-                .setTitle(`📜 History: ${item.version} - ${item.title}`)
-                .setDescription(`### 📅 ${item.date}\n\n${item.content}`)
-                .setColor(0x565f89) // History color (calm navy/grey)
+                .setTitle(`システムアップデート (${item.version})`)
+                .setDescription(`いつもご利用ありがとうございます。以下の機能を更新・改善いたしました。\n\n${item.content}`)
+                .setColor(0x57F287) // Discord Green
                 .setFooter({
-                    text: `AkatsukiBot | Archived Record`,
-                    iconURL: client.user.displayAvatarURL()
-                })
-                .setTimestamp(new Date(item.date.split('-')[0].replace(/\//g, '-'))); // Approximate timestamp
+                    text: `AkatsukiBot Update System • ${item.date}`,
+                });
 
             await channel.send({ embeds: [embed] });
             console.log(`Posted: ${item.version}`);
 
-            // Wait 2 seconds to ensure order and avoid rate limits
+            // Wait 2 seconds to ensure order
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
