@@ -209,7 +209,7 @@
                                     'badge-tier-trial-pro-plus': sub.tier === 'Trial Pro+',
                                     'badge-tier-pro': sub.tier === 'Pro' || sub.tier === '1' || sub.tier === 1,
                                     'badge-tier-pro-plus': sub.tier === 'Pro+' || sub.tier === '3' || sub.tier === 3,
-                                    'bg-secondary': !['Pro', 'Pro+', 'Trial Pro', 'Trial Pro+', '1', '3', 1, 3].includes(sub.tier)
+                                    'badge-tier-free': !['Pro', 'Pro+', 'Trial Pro', 'Trial Pro+', '1', '3', 1, 3].includes(sub.tier)
                                 }">{{ sub.tier }}</span>
                                 </td>
                                 <td class="text-center">
@@ -304,7 +304,7 @@
                                     'badge-tier-trial-pro-plus': app.parsed_tier === 'Trial Pro+',
                                     'badge-tier-pro': app.parsed_tier === 'Pro',
                                     'badge-tier-pro-plus': app.parsed_tier === 'Pro+',
-                                    'bg-dark': app.parsed_tier !== 'Pro' && app.parsed_tier !== 'Pro+' && app.parsed_tier !== 'Trial Pro' && app.parsed_tier !== 'Trial Pro+'
+                                    'badge-tier-free': app.parsed_tier !== 'Pro' && app.parsed_tier !== 'Pro+' && app.parsed_tier !== 'Trial Pro' && app.parsed_tier !== 'Trial Pro+'
                                 }">{{ app.parsed_tier }}</span>
                                 </td>
                                 <td>
@@ -396,7 +396,7 @@
                                 <div class="flex-grow-1 mx-3"
                                     style="height: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; overflow: hidden;">
                                     <div
-                                        :style="{ width: (count / stats.active_count * 100) + '%', background: tier === 'Pro+' ? 'var(--warning)' : 'var(--primary)', height: '100%' }">
+                                        :style="{ width: (count / stats.active_count * 100) + '%', background: tier === 'Pro+' ? '#e0af68' : (tier === 'Pro' ? '#7aa2f7' : '#565f89'), height: '100%' }">
                                     </div>
                                 </div>
                                 <span class="fw-bold text-end" style="min-width: 30px;">{{ count }}</span>

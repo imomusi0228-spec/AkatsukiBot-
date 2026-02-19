@@ -593,15 +593,25 @@ createApp({
                 if (window.myPieChart) window.myPieChart.destroy();
 
                 const data = detailedStats.value.tier_distribution.overall;
+                const labels = Object.keys(data);
+
+                // Color mapping to match Tier distribution bars
+                const colors = labels.map(tier => {
+                    if (tier.includes('Trial Pro+')) return 'rgba(224, 175, 104, 0.6)';
+                    if (tier.includes('Trial Pro')) return 'rgba(122, 162, 247, 0.6)';
+                    if (tier.includes('Pro+')) return '#e0af68';
+                    if (tier.includes('Pro')) return '#7aa2f7';
+                    if (tier === 'Free') return '#565f89';
+                    return '#414868'; // Default border color
+                });
+
                 window.myPieChart = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
-                        labels: Object.keys(data),
+                        labels: labels,
                         datasets: [{
                             data: Object.values(data),
-                            backgroundColor: [
-                                '#7aa2f7', '#e0af68', '#bb9af7', '#9ece6a', '#f7768e', '#565f89', '#414868'
-                            ],
+                            backgroundColor: colors,
                             borderWidth: 0
                         }]
                     },

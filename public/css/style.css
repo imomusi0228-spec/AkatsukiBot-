@@ -112,6 +112,12 @@ h6 {
     border: 1px dashed rgba(224, 175, 104, 0.8);
 }
 
+.badge-tier-free {
+    background-color: rgba(86, 95, 137, 0.2);
+    color: #565f89;
+    border: 1px solid rgba(86, 95, 137, 0.5);
+}
+
 /* Stats Cards */
 .stat-card {
     display: flex;
