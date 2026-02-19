@@ -235,16 +235,6 @@ createApp({
             loadData();
         }
 
-        const updateTier = async () => {
-            const gId = editModal.data.guild_id;
-            await api(`/subscriptions/${gId}`, 'PUT', {
-                action: 'update_tier',
-                tier: editModal.data.tier
-            });
-            alert('プランを更新しました');
-            loadData();
-        }
-
         const createSub = async () => {
             if (!addModal.data.guild_id || !addModal.data.user_id) {
                 alert('サーバーIDとユーザーIDは必須やな');
