@@ -4,12 +4,7 @@ const db = require('./db');
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const history = [
-    {
-        version: 'v1.0.0',
-        date: '2026/02/11',
-        title: '起源 - Akatsuki Bot 正式リリース',
-        content: `**[Launch]** Akatsuki Bot 正式リリース\n**[Log]** VC入退室ログのスレッド化機能を搭載\n**[Dashboard]** サーバー運営のための基本ダッシュボードを公開`
-    },
+
     {
         version: 'v1.1.0 〜 v1.2.1',
         date: '2026/02/11-13',
