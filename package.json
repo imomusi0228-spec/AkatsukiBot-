@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node index.js",
-    "maintenance": "node scripts/maintenance.js"
+    "maintenance": "node scripts/maintenance.js",
+    "register-commands": "node scripts/register-commands.js"
   },
   "keywords": [],
   "author": "",

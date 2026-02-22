@@ -171,6 +171,40 @@ router.post('/:id/reject', authMiddleware, async (req, res) => {
     }
 });
 
+// Hold application (New)
+router.post('/:id/hold', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const appRes = await db.query('SELECT author_name, author_id, parsed_booth_name FROM applications WHERE id = $1', [id]);
+        if (appRes.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        const app = appRes.rows[0];
+
+        await db.query('UPDATE applications SET status = \'on_hold\' WHERE id = $1', [id]);
+
+        // Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details)
+            VALUES ($1, $2, $3, $4, 'HOLD_APP', 'Put application on hold')
+        `, [operatorId, operatorName, id, targetDesc]);
+
+        // Notify
+        await sendWebhookNotification({
+            title: 'Application Put on Hold',
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}`,
+            color: 0xf1c40f,
+            fields: [{ name: 'Operator', value: operatorName, inline: true }]
+        });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Cancel approved application
 router.post('/:id/cancel', authMiddleware, async (req, res) => {
     const { id } = req.params;

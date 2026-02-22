@@ -98,6 +98,30 @@ async function initDB() {
         metadata JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       `,
+      command_usage_logs: `
+        id SERIAL PRIMARY KEY,
+        command_name VARCHAR(255) NOT NULL,
+        guild_id VARCHAR(255),
+        user_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
+      guild_member_snapshots: `
+        id SERIAL PRIMARY KEY,
+        guild_id VARCHAR(255) NOT NULL,
+        member_count INTEGER NOT NULL,
+        captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
+      tier_role_mappings: `
+        tier VARCHAR(50) PRIMARY KEY,
+        role_id VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
+      staff_permissions: `
+        user_id VARCHAR(255) PRIMARY KEY,
+        username VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'viewer',
+        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
       bot_system_settings: `
         key VARCHAR(255) PRIMARY KEY,
         value TEXT,

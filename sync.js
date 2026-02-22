@@ -2,12 +2,28 @@ const { Client } = require('discord.js');
 const db = require('./db');
 
 const SUPPORT_GUILD_ID = process.env.SUPPORT_GUILD_ID;
-const ROLES = {
+const ENV_ROLES = {
     'ProMonthly': (process.env.ROLE_PRO_MONTHLY || '').trim(),
     'ProYearly': (process.env.ROLE_PRO_YEARLY || '').trim(),
     'ProPlusMonthly': (process.env.ROLE_PRO_PLUS_MONTHLY || '').trim(),
     'ProPlusYearly': (process.env.ROLE_PRO_PLUS_YEARLY || '').trim()
 };
+
+async function getDynamicRoles() {
+    try {
+        const res = await db.query('SELECT tier, role_id FROM tier_role_mappings');
+        if (res.rows.length === 0) return ENV_ROLES;
+
+        const mappings = {};
+        res.rows.forEach(row => {
+            mappings[row.tier] = row.role_id;
+        });
+        return { ...ENV_ROLES, ...mappings };
+    } catch (e) {
+        console.error('[Sync] Failed to fetch dynamic roles:', e.message);
+        return ENV_ROLES;
+    }
+}
 
 /**
  * Updates member roles based on the given tier.
@@ -23,17 +39,19 @@ async function updateMemberRoles(guild, userId, tier) {
             return false;
         }
 
+        const ROLES = await getDynamicRoles();
         const rolesToRemove = [
             ROLES['ProMonthly'], ROLES['ProYearly'],
-            ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']
+            ROLES['ProPlusMonthly'], ROLES['ProPlusYearly'],
+            ROLES['Pro'], ROLES['Pro+']
         ].filter(id => id); // Remove empty/null strings
 
         let rolesToAdd = [];
         if (tier === 'Pro+' || tier === 'Trial Pro+') {
-            // Favor Yearly if both might exist, but usually just one
-            rolesToAdd = [ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']].filter(id => id);
+            // Favor Yearly/Specific from DB if both might exist
+            rolesToAdd = [ROLES['Pro+'], ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']].filter(id => id);
         } else if (tier === 'Pro' || tier === 'Trial Pro') {
-            rolesToAdd = [ROLES['ProMonthly'], ROLES['ProYearly']].filter(id => id);
+            rolesToAdd = [ROLES['Pro'], ROLES['ProMonthly'], ROLES['ProYearly']].filter(id => id);
         }
 
         // To be safe, we only add the roles the user *actually* should have based on current roles if we wanted to be precise,
@@ -88,11 +106,12 @@ async function syncSubscriptions(client) {
     let updatedCount = 0;
     let errors = [];
 
+    const ROLES = await getDynamicRoles();
     for (const [memberId, member] of members) {
         let tier = 'Free';
-        if (member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
+        if (member.roles.cache.has(ROLES['Pro+']) || member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
             tier = 'Pro+';
-        } else if (member.roles.cache.has(ROLES['ProYearly']) || member.roles.cache.has(ROLES['ProMonthly'])) {
+        } else if (member.roles.cache.has(ROLES['Pro']) || member.roles.cache.has(ROLES['ProYearly']) || member.roles.cache.has(ROLES['ProMonthly'])) {
             tier = 'Pro';
         }
 

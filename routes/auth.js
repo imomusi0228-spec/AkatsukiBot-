@@ -24,6 +24,22 @@ setInterval(() => {
 // Circuit Breaker for Rate Limiting (Cloudflare Error 1015)
 let rateLimitUntil = 0;
 
+// CSRF Token Endpoint (for SPA/Frontend to ensure they have a token)
+router.get('/csrf', (req, res) => {
+    // If cookie exists, return it (or just status OK since it's in cookie)
+    let csrfToken = req.cookies['csrf_token'];
+    if (!csrfToken) {
+        csrfToken = crypto.randomBytes(32).toString('hex');
+        res.cookie('csrf_token', csrfToken, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+            sameSite: 'Lax'
+        });
+    }
+    res.json({ csrfToken });
+});
+
 
 
 // Login Route
@@ -127,6 +143,15 @@ router.get('/callback', async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             maxAge: 1000 * 60 * 60 * 24 * 7
+        });
+
+        // CSRF Token (Double Submit Cookie Pattern)
+        const csrfToken = crypto.randomBytes(32).toString('hex');
+        res.cookie('csrf_token', csrfToken, {
+            httpOnly: false, // Must be readable by client JS to set the header
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+            sameSite: 'Lax' // Allow top-level navigations to still send it, Strict might be too aggressive for some flows
         });
 
         res.redirect('/');

@@ -27,9 +27,12 @@ createApp({
             tier_distribution: { paid: {}, trial: {}, overall: {} },
             retention_rate: 0,
             growth_data: [],
-            heatmap_data: []
+            heatmap_data: [],
+            top_commands: []
         });
         const selectedSubs = ref([]);
+        const roleMappings = ref([]);
+        const staffList = ref([]);
 
         const importPreview = ref([]);
         const isImporting = ref(false);
@@ -47,6 +50,11 @@ createApp({
         });
 
         // Methods
+        const showAlert = (message, type = 'info') => {
+            // Simple alert for now, could be replaced with a more sophisticated UI notification
+            alert(message);
+        };
+
         const checkAuth = async () => {
             try {
                 const res = await fetch('/api/auth/status');
@@ -81,23 +89,127 @@ createApp({
             return res.json();
         };
 
+        const fetchRoleMappings = async () => {
+            try {
+                const res = await api('/settings/roles');
+                roleMappings.value = res;
+            } catch (err) {
+                console.error('Failed to fetch role mappings:', err);
+            }
+        };
+
+        const saveRoleMapping = async (mapping) => {
+            try {
+                await api('/settings/roles', 'POST', mapping);
+                showAlert('ロール設定を保存しました。', 'success');
+            } catch (err) {
+                showAlert('保存に失敗しました: ' + err.message, 'danger');
+            }
+        };
+
+        const addRoleMapping = () => {
+            const tier = prompt('ティア名を入力してください (例: Pro, Pro+)');
+            if (tier) {
+                roleMappings.value.push({ tier, role_id: '' });
+            }
+        };
+
+        const rejectApplication = async (id) => {
+            if (!confirm('この申請を却下しますか？')) return;
+            try {
+                await api(`/applications/${id}/reject`, 'POST');
+                loadData();
+                showAlert('申請を却下しました。', 'info');
+            } catch (err) {
+                showAlert('却下失敗: ' + err.message, 'danger');
+            }
+        };
+
+        const holdApplication = async (id) => {
+            if (!confirm('この申請を保留にしますか？')) return;
+            try {
+                await api(`/applications/${id}/hold`, 'POST');
+                loadData();
+                showAlert('申請を保留にしました。', 'warning');
+            } catch (err) {
+                showAlert('保留失敗: ' + err.message, 'danger');
+            }
+        };
+
+        const deleteRoleMapping = async (tier) => {
+            if (!confirm(`ティア「${tier}」の設定を削除しますか？`)) return;
+            try {
+                await api(`/settings/roles/${tier}`, 'DELETE');
+                roleMappings.value = roleMappings.value.filter(m => m.tier !== tier);
+                showAlert('設定を削除しました。', 'info');
+            } catch (err) {
+                showAlert('削除に失敗しました: ' + err.message, 'danger');
+            }
+        };
+
+        const fetchStaff = async () => {
+            try {
+                const res = await api('/settings/staff');
+                staffList.value = res;
+            } catch (err) {
+                console.error('Failed to fetch staff:', err);
+            }
+        };
+
+        const updateStaffRole = async (member) => {
+            try {
+                await api('/settings/staff', 'POST', member);
+                showAlert('スタッフ権限を更新しました。', 'success');
+            } catch (err) {
+                showAlert('更新に失敗しました: ' + err.message, 'danger');
+            }
+        };
+
+        const addStaff = async () => {
+            const userId = prompt('追加するユーザーのDiscord IDを入力してください');
+            if (!userId) return;
+            const username = prompt('ユーザー名を入力してください (任意)', 'New Staff');
+            const role = confirm('管理者に設定しますか？ (キャンセルでモデレーター)') ? 'admin' : 'moderator';
+
+            try {
+                await api('/settings/staff', 'POST', { user_id: userId, username, role });
+                fetchStaff();
+                showAlert('スタッフを追加しました。', 'success');
+            } catch (err) {
+                showAlert('追加に失敗しました: ' + err.message, 'danger');
+            }
+        };
+
+        const removeStaff = async (userId) => {
+            if (!confirm(`スタッフ (ID: ${userId}) を削除しますか？`)) return;
+            try {
+                await api(`/settings/staff/${userId}`, 'DELETE');
+                staffList.value = staffList.value.filter(s => s.user_id !== userId);
+                showAlert('スタッフを削除しました。', 'info');
+            } catch (err) {
+                showAlert('削除に失敗しました: ' + err.message, 'danger');
+            }
+        };
+
         const loadData = async (isInitial = false) => {
             if (isInitial) loading.value = true;
 
             // Build query params for subscriptions
             let subQuery = `?page=${subPagination.value.page}&limit=${subPagination.value.limit}`;
             if (searchQuery.value) subQuery += `&search=${encodeURIComponent(searchQuery.value)}`;
-            // Filter mapping: active, expired -> we actually handle it via search in SQL ILIKE for now, 
+            // Filter mapping: active, expired -> we actually handle it via search in SQL ILIKE for now,
             // but for full scalability, we'd add &status= filter to API.
             // For now, let's just use the search param.
 
-            const [sRes, aRes, stData, setsRes, dsData, blRes] = await Promise.all([
+            const [sRes, aRes, stData, setsRes, dsData, blRes, rmRes, staffRes] = await Promise.all([
                 api(`/subscriptions${subQuery}`),
                 api(`/applications?page=${appPagination.value.page}&limit=${appPagination.value.limit}`),
                 api('/subscriptions/stats'),
                 api('/settings'),
                 api('/subscriptions/stats/detailed'),
-                api('/blacklist')
+                api('/blacklist'),
+                api('/settings/roles'), // Fetch role mappings
+                api('/settings/staff') // Fetch staff
             ]);
 
             subscriptions.value = sRes.data || [];
@@ -107,12 +219,14 @@ createApp({
             blacklist.value = blRes || [];
             appPagination.value = aRes.pagination || appPagination.value;
 
-            stats.value = stData || {};
+            if (stData) stats.value = stData;
             // Merge properties to avoid losing webhook_url if it's missing from API
             if (setsRes) {
                 Object.assign(settings.value, setsRes);
             }
             detailedStats.value = dsData || { tier_distribution: { paid: {}, trial: {}, overall: {} }, retention_rate: 0, growth_data: [] };
+            roleMappings.value = rmRes || []; // Assign role mappings
+            staffList.value = staffRes || []; // Assign staff list
 
             if (isInitial) loading.value = false;
             loadAnnouncements(); // Fetch announcements too
@@ -701,8 +815,9 @@ createApp({
             toggleSelectAll, bulkDeactivate,
             announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit, postNow,
             applyTemplate, fetchBotVersion, insertText,
-            blacklist, removeFromBlacklist, openBlacklistModal, handleCsvDrop, handleCsvSelect, executeImport, importPreview, isImporting
+            blacklist, removeFromBlacklist, openBlacklistModal, handleCsvDrop, handleCsvSelect, executeImport, importPreview, isImporting,
+            roleMappings, fetchRoleMappings, saveRoleMapping, addRoleMapping, deleteRoleMapping,
+            staffList, fetchStaff, updateStaffRole, addStaff, removeStaff
         };
     }
 }).mount('#app');
-

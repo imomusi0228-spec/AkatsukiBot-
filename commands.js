@@ -30,6 +30,19 @@ const publicCommands = [
 ];
 
 const commands = [...adminCommands, ...publicCommands];
+const db = require('./db');
+
+async function logCommandUsage(interaction) {
+    if (!interaction.isChatInputCommand()) return;
+    try {
+        await db.query(
+            'INSERT INTO command_usage_logs (command_name, guild_id, user_id) VALUES ($1, $2, $3)',
+            [interaction.commandName, interaction.guildId, interaction.user.id]
+        );
+    } catch (e) {
+        console.error('[Analytics] Failed to log command usage:', e.message);
+    }
+}
 
 async function handleInteraction(interaction) {
     // 1. Blacklist check for ALL interaction types (User and Guild)
@@ -127,6 +140,7 @@ async function handleInteraction(interaction) {
 
     if (['sync', 'activate', 'setup_vc', 'setup_application', 'move'].includes(interaction.commandName)) {
         try {
+            await logCommandUsage(interaction);
             const commandHandler = require(`./subcommands/${interaction.commandName}`);
             await commandHandler(interaction);
         } catch (error) {

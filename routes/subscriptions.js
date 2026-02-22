@@ -162,7 +162,8 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
                 overall: {}
             },
             retention_rate: 0,
-            growth_data: []
+            growth_data: [],
+            top_commands: []
         };
 
         // All active subscriptions for distribution
@@ -226,7 +227,35 @@ router.get('/stats/detailed', authMiddleware, async (req, res) => {
         }
         stats.heatmap_data = heatmapData;
 
+        // Top Commands (Last 30 days)
+        const commandRes = await db.query(`
+            SELECT command_name, COUNT(*) as count 
+            FROM command_usage_logs 
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY command_name 
+            ORDER BY count DESC 
+            LIMIT 10
+        `);
+        stats.top_commands = commandRes.rows;
+
         res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/subscriptions/analytics/members/:guildId
+router.get('/analytics/members/:guildId', authMiddleware, async (req, res) => {
+    const { guildId } = req.params;
+    try {
+        const result = await db.query(`
+            SELECT captured_at as date, member_count 
+            FROM guild_member_snapshots 
+            WHERE guild_id = $1 
+            ORDER BY captured_at ASC 
+            LIMIT 30
+        `, [guildId]);
+        res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

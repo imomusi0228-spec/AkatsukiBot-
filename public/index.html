@@ -343,19 +343,24 @@
                                     <span v-else class="badge" :class="{
                                     'bg-warning': app.status === 'pending',
                                     'bg-danger': app.status === 'rejected',
+                                    'bg-info': app.status === 'on_hold',
                                     'bg-secondary': app.status === 'cancelled'
                                 }">
                                         {{ app.status === 'pending' ? '承認待ち' : (app.status === 'rejected' ? '却下' :
-                                        app.status) }}
+                                        (app.status === 'on_hold' ? '保留中' : app.status)) }}
                                     </span>
                                 </td>
                                 <td class="text-end">
-                                    <div v-if="app.status === 'pending'">
-                                        <button class="btn btn-sm btn-success me-1" @click="approveApp(app)">承認</button>
-                                        <button class="btn btn-sm btn-danger" @click="deleteApp(app.id)">拒否</button>
+                                    <div v-if="app.status === 'pending' || app.status === 'on_hold'"
+                                        class="d-flex gap-1 justify-content-end">
+                                        <button class="btn btn-sm btn-success" @click="approveApp(app)">承認</button>
+                                        <button v-if="app.status === 'pending'" class="btn btn-sm btn-warning"
+                                            @click="holdApplication(app.id)">保留</button>
+                                        <button v-if="currentUserRole === 'admin'" class="btn btn-sm btn-danger"
+                                            @click="rejectApplication(app.id)">却下</button>
                                     </div>
-                                    <div v-else>
-                                        <button class="btn btn-sm btn-outline-danger"
+                                    <div v-else class="d-flex gap-1 justify-content-end">
+                                        <button v-if="currentUserRole === 'admin'" class="btn btn-sm btn-outline-danger"
                                             @click="deleteApp(app.id)">削除</button>
                                     </div>
                                 </td>
@@ -444,6 +449,20 @@
                             <h5 class="mb-4">月別新規契約推移 (有料プランのみ)</h5>
                             <div style="height: 300px;">
                                 <canvas id="growthChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Commands -->
+                    <div class="col-md-4 mt-4">
+                        <div class="panel h-100">
+                            <h5 class="mb-4 text-accent"><i class="bi bi-terminal me-2"></i>人気コマンド (過去30日)</h5>
+                            <div v-if="detailedStats.top_commands.length === 0" class="text-muted small">データなし</div>
+                            <div v-for="cmd in detailedStats.top_commands" :key="cmd.command_name"
+                                class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-dark border border-secondary font-monospace">/{{ cmd.command_name
+                                    }}</span>
+                                <span class="fw-bold">{{ cmd.count }} 回</span>
                             </div>
                         </div>
                     </div>
@@ -689,14 +708,98 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label text-accent">
-                            自動承認モード
-                            <span class="ms-1 cursor-help" title="オンにすると、有効なライセンスキーが申請された際に自動的にロール付与などの処理を行うよ。現在は開発中..."
-                                style="font-size: 0.8em; opacity: 0.7;">?</span>
-                        </label>
+                        <label class="form-label text-accent">通知設定 (Reminders)</label>
                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" disabled>
-                            <label class="form-check-label text-muted">自動承認を有効にする (Coming Soon)</label>
+                            <input class="form-check-input" type="checkbox" v-model="settings.dm_reminders_enabled"
+                                @change="updateSetting('dm_reminders_enabled', settings.dm_reminders_enabled)">
+                            <label class="form-check-label">期限切れ前のDMリマインダーを有効にする</label>
+                        </div>
+                        <div class="form-text text-muted">
+                            有効にすると、期限の7日前と1日前に自動的に通知を送るよ。
+                        </div>
+                    </div>
+
+                    <div class="mb-4 pt-3 border-top border-secondary">
+                        <label class="form-label text-accent d-flex justify-content-between">
+                            <span>ロール同期設定 (Dynamic Role Sync)</span>
+                            <button class="btn btn-sm btn-outline-info" @click="addRoleMapping">追加</button>
+                        </label>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>ティア名</th>
+                                        <th>ロールID</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="mapping in roleMappings" :key="mapping.tier">
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm"
+                                                v-model="mapping.tier" readonly>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm"
+                                                v-model="mapping.role_id" @change="saveRoleMapping(mapping)">
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                @click="deleteRoleMapping(mapping.tier)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="roleMappings.length === 0">
+                                        <td colspan="3" class="text-center text-muted small">設定なし (環境変数を使用中)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="form-text text-muted">
+                                ここで設定したロールIDは、環境変数よりも優先して使用されるよ。
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 pt-3 border-top border-secondary">
+                        <label class="form-label text-accent d-flex justify-content-between">
+                            <span>スタッフ権限管理 (Team Access Control)</span>
+                            <button class="btn btn-sm btn-outline-info" @click="addStaff">追加</button>
+                        </label>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>ユーザーID</th>
+                                        <th>ユーザー名</th>
+                                        <th>権限</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="member in staffList" :key="member.user_id">
+                                        <td>{{ member.user_id }}</td>
+                                        <td>{{ member.username }}</td>
+                                        <td>
+                                            <select
+                                                class="form-select form-select-sm bg-dark text-white border-secondary"
+                                                v-model="member.role" @change="updateStaffRole(member)">
+                                                <option value="moderator">モデレーター (Moderator)</option>
+                                                <option value="admin">管理者 (Admin)</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                @click="removeStaff(member.user_id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="staffList.length === 0">
+                                        <td colspan="4" class="text-center text-muted small">登録されているスタッフはいません。</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
