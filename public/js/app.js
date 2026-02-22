@@ -876,7 +876,10 @@ createApp({
             blacklist, removeFromBlacklist, openBlacklistModal, handleCsvDrop, handleCsvSelect, executeImport, importPreview, isImporting,
             roleMappings, fetchRoleMappings, saveRoleMapping, addRoleMapping, deleteRoleMapping,
             staffList, fetchStaff, updateStaffRole, addStaff, removeStaff,
-            currentUserRole
+            currentUserRole,
+            automationRules, addAutomationRule, deleteAutomationRule,
+            apiKeys, newApiKeyName, createApiKey, deleteApiKey,
+            newRule, rejectApplication, holdApplication
         };
     }
 }).mount('#app');
