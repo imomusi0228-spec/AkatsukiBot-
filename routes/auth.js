@@ -144,21 +144,28 @@ router.get('/callback', async (req, res) => {
             [sessionId, user.id, user.username, user.avatar, user.discriminator, expiry]
         );
 
+        const isProduction = process.env.NODE_ENV === 'production';
+        const isSecure = isProduction && PUBLIC_URL.startsWith('https');
+
         res.cookie('session_id', sessionId, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 1000 * 60 * 60 * 24 * 7
+            secure: isSecure,
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+            path: '/',
+            sameSite: 'Lax'
         });
 
         // CSRF Token (Double Submit Cookie Pattern)
         const csrfToken = crypto.randomBytes(32).toString('hex');
         res.cookie('csrf_token', csrfToken, {
             httpOnly: false, // Must be readable by client JS to set the header
-            secure: process.env.NODE_ENV === 'production',
+            secure: isSecure,
             maxAge: 1000 * 60 * 60 * 24 * 7,
-            sameSite: 'Lax' // Allow top-level navigations to still send it, Strict might be too aggressive for some flows
+            path: '/',
+            sameSite: 'Lax'
         });
 
+        console.log(`[OAuth] Successful login for user ${user.id}. Session set.`);
         res.redirect('/');
 
     } catch (error) {
@@ -211,10 +218,14 @@ router.get('/status', async (req, res) => {
                         }
                     });
                 }
+            } else {
+                console.warn(`[Auth Status] Session ${sessionId} not found in DB.`);
             }
         } catch (err) {
             console.error('Status check error:', err);
         }
+    } else {
+        // console.debug('[Auth Status] No session_id cookie found.');
     }
     res.json({ authenticated: false });
 });
