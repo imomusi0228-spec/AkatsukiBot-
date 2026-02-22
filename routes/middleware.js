@@ -124,12 +124,13 @@ async function authMiddleware(req, res, next) {
                 }
             }
         } catch (err) {
-            console.error('Session check error:', err);
+            console.error('[AuthMW] Database error:', err);
         }
     } else {
-        // Only log if it's an API call, avoid bloating logs for static assets
+        // Only log if it's an API call
         if (req.path.startsWith('/api/') && !req.path.startsWith('/api/auth/status')) {
-            console.warn(`[AuthMW] Unauthorized: No sessionId cookie. Path: ${req.path}`);
+            const hasCookies = Object.keys(req.cookies || {}).length > 0;
+            console.warn(`[AuthMW] Unauthorized: No sessionId. Path: ${req.path}, CookiesPresent: ${hasCookies}`);
         }
     }
 

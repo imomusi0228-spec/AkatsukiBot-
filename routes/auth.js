@@ -149,7 +149,10 @@ router.get('/callback', async (req, res) => {
         );
 
         const isProduction = process.env.NODE_ENV === 'production';
-        const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+        // Relaxing secure flag slightly to ensure compatibility, but still favoring HTTPS if detected
+        const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https' || (isProduction && PUBLIC_URL.startsWith('https'));
+
+        console.log(`[OAuth] Setting cookies for user ${user.id}. isSecure: ${isSecure}`);
 
         res.cookie('session_id', sessionId, {
             httpOnly: true,
@@ -169,7 +172,7 @@ router.get('/callback', async (req, res) => {
             sameSite: 'Lax'
         });
 
-        console.log(`[OAuth] Successful login for user ${user.id}. Session set.`);
+        console.log(`[OAuth] Successful login for user ${user.id}. Session set in DB and cookies.`);
         res.redirect('/');
 
     } catch (error) {
@@ -198,6 +201,8 @@ router.get('/callback', async (req, res) => {
 // Status Route
 router.get('/status', async (req, res) => {
     const sessionId = req.cookies['session_id'];
+    const hasCookies = Object.keys(req.cookies || {}).length > 0;
+
     if (sessionId) {
         try {
             const result = await db.query('SELECT * FROM user_sessions WHERE session_id = $1', [sessionId]);
@@ -221,15 +226,21 @@ router.get('/status', async (req, res) => {
                             role: role
                         }
                     });
+                } else {
+                    console.warn(`[Auth Status] Session ${sessionId} found but EXPIRED.`);
                 }
             } else {
-                console.warn(`[Auth Status] Session ${sessionId} not found in DB.`);
+                console.warn(`[Auth Status] Session ${sessionId} NOT found in database.`);
             }
         } catch (err) {
-            console.error('Status check error:', err);
+            console.error('[Auth Status] Database error:', err);
         }
     } else {
-        // console.debug('[Auth Status] No session_id cookie found.');
+        if (hasCookies) {
+            console.warn('[Auth Status] session_id cookie missing, but other cookies found:', Object.keys(req.cookies));
+        } else {
+            // console.warn('[Auth Status] No cookies sent by browser.');
+        }
     }
     res.json({ authenticated: false });
 });
