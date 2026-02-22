@@ -15,8 +15,12 @@ app.use(cookieParser());
 // DEBUG: Global Request Logger
 app.use((req, res, next) => {
     if (!req.path.startsWith('/css') && !req.path.startsWith('/js') && !req.path.includes('.png')) {
-        const authHeader = req.headers['authorization'] ? `Auth: ${req.headers['authorization'].substring(0, 15)}...` : 'NoAuth';
-        console.log(`[REQ] ${req.method} ${req.path} - ${authHeader} - Cookies: ${JSON.stringify(req.cookies || {})}`);
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            const authHeader = req.headers['authorization'] ? `Auth: ${req.headers['authorization'].substring(0, 15)}...` : 'NoAuth';
+            console.log(`[REQ] ${req.method} ${req.path} - Status: ${res.statusCode} - ${authHeader} - ${duration}ms - Cookies: ${JSON.stringify(req.cookies || {})}`);
+        });
     }
     next();
 });

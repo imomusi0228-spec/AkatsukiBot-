@@ -204,9 +204,13 @@ router.get('/status', async (req, res) => {
     if (sessionId) {
         try {
             const result = await db.query('SELECT * FROM user_sessions WHERE session_id = $1', [sessionId]);
+            console.log(`[Status] Session ${sessionId} found: ${result.rows.length > 0}`);
             if (result.rows.length > 0) {
                 const session = result.rows[0];
-                if (new Date(session.expiry) > new Date()) {
+                const now = new Date();
+                const expiry = new Date(session.expiry);
+                console.log(`[Status] User: ${session.user_id}, Expiry: ${expiry.toISOString()}, Now: ${now.toISOString()}`);
+                if (expiry > now) {
                     // Determine Role
                     const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
                     const isExplicitAdmin = allowedIds.includes(session.user_id);
