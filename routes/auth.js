@@ -193,12 +193,21 @@ router.get('/status', async (req, res) => {
             if (result.rows.length > 0) {
                 const session = result.rows[0];
                 if (new Date(session.expiry) > new Date()) {
+                    // Determine Role
+                    const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
+                    const isExplicitAdmin = allowedIds.includes(session.user_id);
+                    const staffRes = await db.query('SELECT role FROM staff_permissions WHERE user_id = $1', [session.user_id]);
+                    const staffRole = staffRes.rows.length > 0 ? staffRes.rows[0].role : null;
+
+                    const role = staffRole || (isExplicitAdmin ? 'admin' : 'user');
+
                     return res.json({
                         authenticated: true,
                         user: {
                             id: session.user_id,
                             username: session.username,
-                            avatar: session.avatar
+                            avatar: session.avatar,
+                            role: role
                         }
                     });
                 }

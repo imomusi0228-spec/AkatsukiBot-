@@ -53,6 +53,11 @@ createApp({
             return subscriptions.value;
         });
 
+        const currentUserRole = computed(() => {
+            if (isAdminLogged.value) return 'admin';
+            return user.value?.role || 'user';
+        });
+
         // Methods
         const showAlert = (message, type = 'info') => {
             // Simple alert for now, could be replaced with a more sophisticated UI notification
@@ -853,7 +858,8 @@ createApp({
             applyTemplate, fetchBotVersion, insertText,
             blacklist, removeFromBlacklist, openBlacklistModal, handleCsvDrop, handleCsvSelect, executeImport, importPreview, isImporting,
             roleMappings, fetchRoleMappings, saveRoleMapping, addRoleMapping, deleteRoleMapping,
-            staffList, fetchStaff, updateStaffRole, addStaff, removeStaff
+            staffList, fetchStaff, updateStaffRole, addStaff, removeStaff,
+            currentUserRole
         };
     }
 }).mount('#app');
