@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { authMiddleware } = require('./middleware');
-const crypto = require('crypto');
-const { sendWebhookNotification } = require('../services/notif');
+const { approveApplication } = require('../services/applicationService');
 
 // Get all applications with pagination
 router.get('/', authMiddleware, async (req, res) => {
@@ -82,57 +81,14 @@ router.get('/', authMiddleware, async (req, res) => {
 router.post('/:id/approve', authMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
-        const appRes = await db.query('SELECT * FROM applications WHERE id = $1', [id]);
-        if (appRes.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-
-        const app = appRes.rows[0];
-
-        // 1. Generate a new License Key
-        const tier = app.parsed_tier || 'Pro';
-        let durationMonths = 1;
-        let durationDays = null;
-
-        if (tier === 'Trial Pro') {
-            durationMonths = 0;
-            durationDays = 14;
-        } else if (tier === 'Trial Pro+') {
-            durationMonths = 0;
-            durationDays = 7;
-        }
-
-        const randomBuffer = crypto.randomBytes(4);
-        const key = `AK-${randomBuffer.toString('hex').toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-        const reservedUser = app.parsed_user_id || null;
-
-        // 2. Insert into license_keys
-        await db.query(`
-            INSERT INTO license_keys (key_id, tier, duration_months, duration_days, reserved_user_id, notes)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        `, [key, tier, durationMonths, durationDays, reservedUser, `Generated for App ID: ${id} (${app.parsed_booth_name})`]);
-
-        // 3. Update application status and store the generated key
-        await db.query('UPDATE applications SET status = \'approved\', license_key = $1 WHERE id = $2', [key, id]);
-
-        // Log
         const operatorId = req.user?.userId || 'Unknown';
         const operatorName = req.user?.username || 'Unknown';
-        const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
-        await db.query(`
-            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata)
-            VALUES ($1, $2, $3, $4, 'APPROVE_APP', $5, $6)
-        `, [operatorId, operatorName, id, targetDesc, `Approved application for ${tier}`, JSON.stringify({ tier, key, author_id: app.author_id })]);
 
-        // Notify
-        await sendWebhookNotification({
-            title: 'Application Approved',
-            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n**Tier:** ${tier}\n**Generated Key:** \`${key}\``,
-            color: 0x2ecc71,
-            fields: [{ name: 'Operator', value: operatorName, inline: true }]
-        });
-
-        res.json({ success: true, key: key, tier: tier });
+        const result = await approveApplication(id, operatorId, operatorName);
+        res.json(result);
     } catch (err) {
         console.error(err);
+        if (err.message === 'Application not found') return res.status(404).json({ error: 'Not found' });
         res.status(500).json({ error: 'Database error' });
     }
 });

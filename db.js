@@ -139,12 +139,28 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       `,
       blacklist: `
-        target_id VARCHAR(255) PRIMARY KEY,
-        type VARCHAR(50) NOT NULL, -- 'user' or 'guild'
-        reason TEXT,
-        operator_id VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      `
+          target_id VARCHAR(255) PRIMARY KEY,
+          type VARCHAR(50) NOT NULL, -- 'user' or 'guild'
+          reason TEXT,
+          operator_id VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        `,
+      auto_approval_rules: `
+          id SERIAL PRIMARY KEY,
+          pattern TEXT NOT NULL,
+          tier VARCHAR(50) NOT NULL,
+          duration_months INTEGER DEFAULT 1,
+          duration_days INTEGER,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        `,
+      external_api_keys: `
+          key_id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255),
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          last_used_at TIMESTAMP
+        `
     };
 
     for (const [name, schema] of Object.entries(tables)) {

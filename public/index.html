@@ -807,11 +807,78 @@
                         </div>
                     </div>
 
-                    <div class="alert alert-info border-0 rounded-4 p-4 d-flex align-items-center">
-                        <div class="display-6 me-4"><i class="bi bi-rocket-takeoff"></i></div>
-                        <div>
-                            <h6 class="alert-heading mb-1">Coming Soon...</h6>
-                            <p class="mb-0 small">自動承認ルールのカスタマイズや、外部サービスとの連携設定もここに追加される予定だよ。お楽しみに！</p>
+                    <div class="mb-4 pt-3 border-top border-secondary">
+                        <label class="form-label text-accent d-flex justify-content-between">
+                            <span>自動承認ルール (Auto-Approval Rules)</span>
+                            <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal"
+                                data-bs-target="#ruleModal">追加</button>
+                        </label>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>パターン (RegExp)</th>
+                                        <th>プラン</th>
+                                        <th>期間</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="rule in automationRules" :key="rule.id">
+                                        <td><code>{{ rule.pattern }}</code></td>
+                                        <td>{{ rule.tier }}</td>
+                                        <td>{{ rule.duration_months }}ヶ月 {{ rule.duration_days }}日</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                @click="deleteAutomationRule(rule.id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="automationRules.length === 0">
+                                        <td colspan="4" class="text-center text-muted small">自動化ルールはありません。</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 pt-3 border-top border-secondary">
+                        <label class="form-label text-accent d-flex justify-content-between">
+                            <span>外部連携設定 (External API Keys)</span>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm" placeholder="キーの名前"
+                                    v-model="newApiKeyName">
+                                <button class="btn btn-sm btn-outline-info" @click="createApiKey">発行</button>
+                            </div>
+                        </label>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>名前</th>
+                                        <th>キー (ID)</th>
+                                        <th>最終利用</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="k in apiKeys" :key="k.key_id">
+                                        <td>{{ k.name }}</td>
+                                        <td><code>{{ k.key_id.substring(0, 12) }}...</code></td>
+                                        <td>{{ k.last_used_at ? formatDate(k.last_used_at) : '未使用' }}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                @click="deleteApiKey(k.key_id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="apiKeys.length === 0">
+                                        <td colspan="4" class="text-center text-muted small">APIキーは発行されていません。</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1087,6 +1154,42 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary w-100" @click="createSub">作成実行</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rule Modal -->
+            <div class="modal fade" id="ruleModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content text-white bg-dark border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">自動承認ルールの追加</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">条件パターン (Booth名や申請内容に含まれる文字列)</label>
+                                <input type="text" v-model="newRule.pattern"
+                                    class="form-control bg-dark text-white border-secondary" placeholder="例: テスト用モデル1">
+                                <div class="form-text text-muted">正規表現も使えます（大文字小文字は無視されます）</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">付与するティア</label>
+                                <select v-model="newRule.tier" class="form-select bg-dark text-white border-secondary">
+                                    <option value="Pro">Pro</option>
+                                    <option value="Pro+">Pro+</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">期間 (ヶ月)</label>
+                                <input type="number" v-model.number="newRule.duration_months"
+                                    class="form-control bg-dark text-white border-secondary">
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-primary w-100" @click="addAutomationRule"
+                                data-bs-dismiss="modal">ルールを保存</button>
                         </div>
                     </div>
                 </div>

@@ -33,6 +33,10 @@ createApp({
         const selectedSubs = ref([]);
         const roleMappings = ref([]);
         const staffList = ref([]);
+        const automationRules = ref([]);
+        const apiKeys = ref([]);
+        const newRule = reactive({ pattern: '', tier: 'Pro', duration_months: 1, duration_days: null });
+        const newApiKeyName = ref('');
 
         const importPreview = ref([]);
         const isImporting = ref(false);
@@ -201,7 +205,7 @@ createApp({
             // but for full scalability, we'd add &status= filter to API.
             // For now, let's just use the search param.
 
-            const [sRes, aRes, stData, setsRes, dsData, blRes, rmRes, staffRes] = await Promise.all([
+            const [sRes, aRes, stData, setsRes, dsData, blRes, rmRes, staffRes, rulesRes, keysRes] = await Promise.all([
                 api(`/subscriptions${subQuery}`),
                 api(`/applications?page=${appPagination.value.page}&limit=${appPagination.value.limit}`),
                 api('/subscriptions/stats'),
@@ -209,7 +213,9 @@ createApp({
                 api('/subscriptions/stats/detailed'),
                 api('/blacklist'),
                 api('/settings/roles'), // Fetch role mappings
-                api('/settings/staff') // Fetch staff
+                api('/settings/staff'), // Fetch staff
+                api('/automations/rules'),
+                api('/automations/keys')
             ]);
 
             subscriptions.value = sRes.data || [];
@@ -227,6 +233,8 @@ createApp({
             detailedStats.value = dsData || { tier_distribution: { paid: {}, trial: {}, overall: {} }, retention_rate: 0, growth_data: [] };
             roleMappings.value = rmRes || []; // Assign role mappings
             staffList.value = staffRes || []; // Assign staff list
+            automationRules.value = rulesRes || [];
+            apiKeys.value = keysRes || [];
 
             if (isInitial) loading.value = false;
             loadAnnouncements(); // Fetch announcements too
@@ -397,6 +405,34 @@ createApp({
             if (!confirm('ライセンス情報を「完全に削除」しますか？\nこの操作は取り消せません。')) return;
             const gId = sub.guild_id;
             await api(`/subscriptions/${gId}/delete`, 'DELETE');
+            loadData();
+        };
+
+        const addAutomationRule = async () => {
+            if (!newRule.pattern) return alert('パターンを入力してな');
+            await api('/automations/rules', 'POST', newRule);
+            newRule.pattern = '';
+            loadData();
+        };
+
+        const deleteAutomationRule = async (id) => {
+            if (!confirm('ルールを削除しますか？')) return;
+            await api(`/automations/rules/${id}`, 'DELETE');
+            loadData();
+        };
+
+        const createApiKey = async () => {
+            const res = await api('/automations/keys', 'POST', { name: newApiKeyName.value });
+            if (res.key) {
+                alert('APIキーを発行しました。一度しか表示されないのでメモしておいてな：\n' + res.key);
+                newApiKeyName.value = '';
+                loadData();
+            }
+        };
+
+        const deleteApiKey = async (keyId) => {
+            if (!confirm('APIキーを削除しますか？')) return;
+            await api(`/automations/keys/${keyId}`, 'DELETE');
             loadData();
         };
 
