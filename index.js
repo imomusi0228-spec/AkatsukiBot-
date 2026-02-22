@@ -106,12 +106,29 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
 async function main() {
     try {
+        console.log('[Main] Starting web server...');
         startServer(client);
+
+        console.log('[Main] Initializing database...');
         await db.initDB();
+
         if (!process.env.DISCORD_TOKEN) throw new Error('DISCORD_TOKEN is missing!');
+
+        console.log('[Main] Logging into Discord...');
         await client.login(process.env.DISCORD_TOKEN.trim());
+
+        console.log('[Main] System startup sequence completed.');
     } catch (error) {
-        console.error('FATAL:', error);
+        console.error('==========================================');
+        console.error('   FATAL STARTUP ERROR');
+        console.error('==========================================');
+        console.error(`Error Name: ${error.name}`);
+        console.error(`Error Message: ${error.message}`);
+        if (error.stack) {
+            console.error('Stack Trace:');
+            console.error(error.stack);
+        }
+        console.error('==========================================');
         process.exit(1);
     }
 }

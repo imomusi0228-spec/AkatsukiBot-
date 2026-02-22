@@ -47,7 +47,6 @@ async function initDB() {
         valid_until TIMESTAMP,
         cached_username VARCHAR(255),
         cached_servername VARCHAR(255),
-        cached_servername VARCHAR(255),
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       `,
