@@ -140,7 +140,8 @@
                 <div v-if="activeTab === 'dashboard'" class="d-flex gap-2">
                     <div v-if="selectedSubs.length > 0" class="me-3 d-flex align-items-center">
                         <span class="badge bg-primary me-2">{{ selectedSubs.length }}件選択中</span>
-                        <button class="btn btn-sm btn-outline-danger me-1" @click="bulkDeactivate">一括停止</button>
+                        <button v-if="currentUserRole === 'admin'" class="btn btn-sm btn-outline-danger me-1"
+                            @click="bulkDeactivate">一括停止</button>
                         <button class="btn btn-sm btn-outline-secondary" @click="selectedSubs = []">解除</button>
                     </div>
 
@@ -157,7 +158,7 @@
                         <option value="expiring">期限間近</option>
                     </select>
 
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                    <button v-if="currentUserRole === 'admin'" class="btn btn-sm btn-primary" data-bs-toggle="modal"
                         data-bs-target="#addModal">新規作成</button>
                 </div>
             </div>
@@ -230,7 +231,7 @@
                                         {{ formatDate(sub.expiry_date) }}
                                     </div>
                                 </td>
-                                <td class="text-end">
+                                <td v-if="currentUserRole === 'admin'" class="text-end">
                                     <button class="btn btn-sm btn-outline-light me-1"
                                         @click="openEditModal(sub)">編集</button>
                                     <button v-if="sub.is_active" class="btn btn-sm btn-outline-warning me-1"
@@ -239,6 +240,9 @@
                                         @click="resumeSub(sub)">再開</button>
                                     <button class="btn btn-sm btn-outline-danger"
                                         @click="hardDeleteSub(sub)">削除</button>
+                                </td>
+                                <td v-else class="text-end text-muted small">
+                                    閲覧のみ可能
                                 </td>
                             </tr>
                         </tbody>
