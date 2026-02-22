@@ -728,6 +728,13 @@ createApp({
         };
 
         onMounted(() => {
+            // Check for tab in hash (e.g., #apps)
+            const hash = window.location.hash.replace('#', '');
+            const validTabs = ['dashboard', 'apps', 'stats', 'logs', 'settings', 'announce', 'blacklist', 'import'];
+            if (hash && validTabs.includes(hash)) {
+                activeTab.value = hash;
+            }
+
             checkAuth();
             window.addEventListener('keydown', handleKeydown);
         });

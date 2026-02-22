@@ -46,9 +46,10 @@ router.post('/', authMiddleware, async (req, res) => {
 // Test webhook
 router.post('/test-webhook', authMiddleware, async (req, res) => {
     try {
+        const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#settings`;
         const result = await sendWebhookNotification({
             title: 'Webhook Test',
-            description: '管理コンソールからのテスト送信だよ。これが見えていれば、設定はバッチリだ。',
+            description: `管理コンソールからのテスト送信だよ。これが見えていれば、設定はバッチリだ。\n\n[**管理画面に戻る**](${dashboardUrl})`,
             color: 0x7aa2f7,
             fields: [
                 { name: 'Status', value: 'Success ✅', inline: true },

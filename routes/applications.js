@@ -113,9 +113,10 @@ router.post('/:id/reject', authMiddleware, async (req, res) => {
         `, [operatorId, operatorName, id, targetDesc]);
 
         // Notify
+        const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#apps`;
         await sendWebhookNotification({
             title: 'Application Rejected',
-            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}`,
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n\n[**管理画面で確認する**](${dashboardUrl})`,
             color: 0xe74c3c,
             fields: [{ name: 'Operator', value: operatorName, inline: true }]
         });
@@ -147,9 +148,10 @@ router.post('/:id/hold', authMiddleware, async (req, res) => {
         `, [operatorId, operatorName, id, targetDesc]);
 
         // Notify
+        const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#apps`;
         await sendWebhookNotification({
             title: 'Application Put on Hold',
-            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}`,
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n\n[**管理画面で確認する**](${dashboardUrl})`,
             color: 0xf1c40f,
             fields: [{ name: 'Operator', value: operatorName, inline: true }]
         });
@@ -181,9 +183,10 @@ router.post('/:id/cancel', authMiddleware, async (req, res) => {
         `, [operatorId, operatorName, id, targetDesc]);
 
         // Notify
+        const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#apps`;
         await sendWebhookNotification({
             title: 'Application Cancelled',
-            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}`,
+            description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n\n[**管理画面で確認する**](${dashboardUrl})`,
             color: 0x95a5a6,
             fields: [{ name: 'Operator', value: operatorName, inline: true }]
         });

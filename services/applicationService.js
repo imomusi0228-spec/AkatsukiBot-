@@ -65,9 +65,10 @@ async function saveApplication(appData) {
         }
 
         // Notify admins via webhook
+        const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#apps`;
         await sendWebhookNotification({
             title: `📝 新規ライセンス申請 (${sourceType === 'modal' ? 'モーダル' : 'メッセージ'})`,
-            description: `新しいライセンス申請が届きました。`,
+            description: `新しいライセンス申請が届きました。\n\n[**管理画面で確認する**](${dashboardUrl})`,
             color: 0x00ff00,
             fields: [
                 { name: '申請者', value: `${authorName} (${authorId})`, inline: true },
@@ -198,9 +199,10 @@ async function approveApplication(appId, operatorId, operatorName, isAuto = fals
     ]);
 
     // 6. Notify
+    const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#apps`;
     await sendWebhookNotification({
         title: isAuto ? '🤖 Auto-Approval Triggered' : '✅ Application Approved',
-        description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n**Tier:** ${tier}\n**Generated Key:** \`${key}\``,
+        description: `**Author:** ${app.author_name} (\`${app.author_id}\`)\n**Booth:** ${app.parsed_booth_name}\n**Tier:** ${tier}\n**Generated Key:** \`${key}\`\n\n[**管理画面で確認する**](${dashboardUrl})`,
         color: isAuto ? 0x3498db : 0x2ecc71,
         fields: [{ name: 'Operator', value: operatorName, inline: true }]
     });
