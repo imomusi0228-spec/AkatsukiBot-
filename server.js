@@ -12,22 +12,23 @@ app.use(express.json());
 app.set('trust proxy', 1);
 app.use(cookieParser());
 
-// DEBUG: Global Request Logger
+// DEBUG: Request Logger (Only for specific or error cases to keep logs clean)
 app.use((req, res, next) => {
     if (!req.path.startsWith('/css') && !req.path.startsWith('/js') && !req.path.includes('.png')) {
         const start = Date.now();
         res.on('finish', () => {
             const duration = Date.now() - start;
-            const authHeader = req.headers['authorization'] ? `Auth: ${req.headers['authorization'].substring(0, 15)}...` : 'NoAuth';
-            // Use originalUrl to see exactly what the frontend requested
-            console.log(`[REQ] ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${authHeader} - ${duration}ms - Cookies: ${JSON.stringify(req.cookies || {})}`);
+            // Only log if it's an API call or an error
+            if (req.path.startsWith('/api/') || res.statusCode >= 400) {
+                const authHeader = req.headers['authorization'] ? 'AuthSet' : 'NoAuth';
+                console.log(`[REQ] ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${authHeader} - ${duration}ms`);
+            }
         });
     }
     next();
 });
 
-// Security Headers (TEMPORARILY DISABLED)
-/*
+// Security Headers
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -40,18 +41,15 @@ app.use(helmet({
         }
     }
 }));
-*/
 
-// Global Rate Limiting (TEMPORARILY DISABLED)
-/*
+// Global Rate Limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200, // Increased from 100 to be safer for dashboard usage
     standardHeaders: true,
     legacyHeaders: false,
 });
 app.use('/api/', limiter);
-*/
 
 app.use(express.static('public'));
 

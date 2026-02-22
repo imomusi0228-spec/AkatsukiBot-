@@ -10,22 +10,18 @@ const { authMiddleware } = require('./middleware');
 async function executeAnnouncementTasks(client, tasks) {
     if (!tasks || !Array.isArray(tasks) || tasks.length === 0) return;
 
-    console.log(`[Announce Tasks] Starting ${tasks.length} tasks...`);
-
     for (const task of tasks) {
         try {
             if (task === 'sync_subs') {
-                console.log('[Announce Tasks] Running syncSubscriptions...');
-                await syncSubscriptions(client);
+                await syncSubscriptions(client).catch(err => console.error(`[Announce Task: sync_subs] Error:`, err.message));
             } else if (task === 'cleanup_logs') {
-                console.log('[Announce Tasks] Cleaning up old logs...');
-                await db.query("DELETE FROM operation_logs WHERE created_at < NOW() - INTERVAL '30 days'");
+                await db.query("DELETE FROM operation_logs WHERE created_at < NOW() - INTERVAL '30 days'").catch(err => console.error(`[Announce Task: cleanup_logs] Error:`, err.message));
             }
         } catch (err) {
-            console.error(`[Announce Tasks] Task "${task}" failed:`, err.message);
+            // High level catch to prevent loop breakage
+            console.error(`[Announce Task Executor] Fatal error for task "${task}":`, err.message);
         }
     }
-    console.log('[Announce Tasks] All tasks completed.');
 }
 
 // POST /api/sync

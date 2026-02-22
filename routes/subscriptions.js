@@ -292,43 +292,6 @@ router.patch('/:id/auto-renew', authMiddleware, async (req, res) => {
     }
 });
 
-// PATCH /api/subscriptions/:id/milestone
-router.patch('/:id/milestone', authMiddleware, async (req, res) => {
-    const { id } = req.params;
-    const { current_milestone, auto_unlock_enabled } = req.body;
-    try {
-        const updates = [];
-        const params = [id];
-
-        if (current_milestone !== undefined) {
-            updates.push(`current_milestone = $${params.length + 1}`);
-            params.push(current_milestone);
-        }
-        if (auto_unlock_enabled !== undefined) {
-            updates.push(`auto_unlock_enabled = $${params.length + 1}`);
-            params.push(auto_unlock_enabled);
-        }
-
-        if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-        // Always update updated_at to NOW() when milestone changes to reset cron timer if needed
-        updates.push(`updated_at = NOW()`);
-
-        const queryText = `UPDATE subscriptions SET ${updates.join(', ')} WHERE guild_id = $1`;
-        await db.query(queryText, params);
-
-        // Log the change
-        const operatorName = req.user?.username || 'Unknown';
-        const operatorId = req.user?.userId || 'Unknown';
-        await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, action_type, details) VALUES ($1, $2, $3, 'UPDATE_MILESTONE', $4)`,
-            [operatorId, operatorName, id, `Updated milestone config: ${JSON.stringify({ current_milestone, auto_unlock_enabled })}`]);
-
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // GET /api/logs (Self History)
 router.get('/logs', authMiddleware, async (req, res) => {
     try {
