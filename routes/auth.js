@@ -217,8 +217,20 @@ router.get('/status', async (req, res) => {
                     const staffRes = await db.query('SELECT role FROM staff_permissions WHERE user_id = $1', [session.user_id]);
                     const staffRole = staffRes.rows.length > 0 ? staffRes.rows[0].role : null;
 
+                    // Get user's subscription tier
+                    const subRes = await db.query('SELECT tier, is_active FROM subscriptions WHERE user_id = $1', [session.user_id]);
+                    const userTier = subRes.rows.length > 0 ? subRes.rows[0].tier : 'Free';
+                    const isActive = subRes.rows.length > 0 ? subRes.rows[0].is_active : false;
+
                     const role = staffRole || (isExplicitAdmin ? 'admin' : 'user');
 
+                    // Normalized Auth Check
+                    if (!isExplicitAdmin && !staffRole && (userTier === 'Free' || userTier === '0' || !isActive)) {
+                        console.warn(`[Status] User ${session.user_id} NOT AUTHORIZED (Tier: ${userTier}, Active: ${isActive})`);
+                        return res.json({ authenticated: false, error: 'unauthorized' });
+                    }
+
+                    console.log(`[Status Success] User: ${session.user_id}, Role: ${role}`);
                     return res.json({
                         authenticated: true,
                         user: {

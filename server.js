@@ -19,7 +19,8 @@ app.use((req, res, next) => {
         res.on('finish', () => {
             const duration = Date.now() - start;
             const authHeader = req.headers['authorization'] ? `Auth: ${req.headers['authorization'].substring(0, 15)}...` : 'NoAuth';
-            console.log(`[REQ] ${req.method} ${req.path} - Status: ${res.statusCode} - ${authHeader} - ${duration}ms - Cookies: ${JSON.stringify(req.cookies || {})}`);
+            // Use originalUrl to see exactly what the frontend requested
+            console.log(`[REQ] ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${authHeader} - ${duration}ms - Cookies: ${JSON.stringify(req.cookies || {})}`);
         });
     }
     next();

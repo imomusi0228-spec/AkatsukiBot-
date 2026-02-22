@@ -65,19 +65,25 @@ createApp({
         };
 
         const checkAuth = async () => {
+            console.log('[CheckAuth] Starting status check...');
             try {
                 // Consistency: Use the same options as api(), plus cache-busting
                 const res = await fetch('/api/auth/status?t=' + Date.now(), {
                     credentials: 'same-origin'
                 });
                 const data = await res.json();
+                console.log('[CheckAuth] Received status:', data);
+
                 if (data.authenticated) {
+                    console.log('[CheckAuth] Logged in as:', data.user.username);
                     user.value = data.user;
                     loadData(true);
                 } else if (localStorage.getItem('admin_token')) {
+                    console.log('[CheckAuth] Falling back to admin_token');
                     isAdminLogged.value = true;
                     loadData(true);
                 } else {
+                    console.log('[CheckAuth] User not logged in.');
                     loading.value = false;
                 }
             } catch (e) {
@@ -97,7 +103,10 @@ createApp({
                 body: body ? JSON.stringify(body) : null,
                 credentials: 'same-origin'
             });
+            console.log(`[API Response] ${method} ${endpoint} - Status: ${res.status}`);
+
             if (res.status === 401 || res.status === 403) {
+                console.warn(`[Auth Violation] API returned ${res.status} for ${endpoint}. Resetting frontend session.`);
                 if (res.status === 403) alert('権限がありません。');
                 user.value = null;
                 isAdminLogged.value = false;
