@@ -36,8 +36,12 @@ async function authMiddleware(req, res, next) {
     const token = req.headers['authorization'];
     const sessionId = req.cookies['session_id'];
 
-    // API Token Access (Bypass CSRF for pure API tokens if they exist, but here it's Bearer ADMIN_TOKEN)
-    if (token === `Bearer ${ADMIN_TOKEN}` || token === ADMIN_TOKEN) {
+    // LOG: Trace Auth Attempt
+    // console.log(`[AuthMW] Request: ${req.method} ${req.path}, SessionID Present: ${!!sessionId}`);
+
+    // API Token Access
+    if (token && (token === `Bearer ${ADMIN_TOKEN}` || token === ADMIN_TOKEN)) {
+        req.user = { userId: 'admin-token', username: 'System Admin', role: 'admin' };
         return next();
     }
 
@@ -92,6 +96,8 @@ async function authMiddleware(req, res, next) {
                         }
                     }
 
+                    const isSecure = process.env.NODE_ENV === 'production' && process.env.PUBLIC_URL.startsWith('https');
+
                     req.user = {
                         userId: session.user_id,
                         username: session.username,
@@ -119,6 +125,11 @@ async function authMiddleware(req, res, next) {
             }
         } catch (err) {
             console.error('Session check error:', err);
+        }
+    } else {
+        // Only log if it's an API call, avoid bloating logs for static assets
+        if (req.path.startsWith('/api/') && !req.path.startsWith('/api/auth/status')) {
+            console.warn(`[AuthMW] Unauthorized: No sessionId cookie. Path: ${req.path}`);
         }
     }
 

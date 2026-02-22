@@ -50,10 +50,14 @@ router.get('/login', (req, res) => {
     }
 
     const state = crypto.randomUUID();
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+
     res.cookie('oauth_state', state, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 1000 * 60 * 5 // 5 minutes
+        secure: isSecure,
+        maxAge: 1000 * 60 * 5, // 5 minutes
+        path: '/',
+        sameSite: 'Lax'
     });
 
     const params = new URLSearchParams({
@@ -145,7 +149,7 @@ router.get('/callback', async (req, res) => {
         );
 
         const isProduction = process.env.NODE_ENV === 'production';
-        const isSecure = isProduction && PUBLIC_URL.startsWith('https');
+        const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
 
         res.cookie('session_id', sessionId, {
             httpOnly: true,
@@ -158,7 +162,7 @@ router.get('/callback', async (req, res) => {
         // CSRF Token (Double Submit Cookie Pattern)
         const csrfToken = crypto.randomBytes(32).toString('hex');
         res.cookie('csrf_token', csrfToken, {
-            httpOnly: false, // Must be readable by client JS to set the header
+            httpOnly: false,
             secure: isSecure,
             maxAge: 1000 * 60 * 60 * 24 * 7,
             path: '/',
