@@ -1169,16 +1169,34 @@
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
-                                <label class="form-label">条件パターン (Booth名や申請内容に含まれる文字列)</label>
+                                <label class="form-label">一致方式</label>
+                                <select class="form-select bg-dark text-white border-secondary"
+                                    v-model="newRule.match_type">
+                                    <option value="regex">正規表現 (部分一致)</option>
+                                    <option value="exact">完全一致 (Booth名)</option>
+                                    <option value="name_match">名前一致 (表示名 == Booth名)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" v-if="newRule.match_type !== 'name_match'">
+                                <label class="form-label">条件パターン</label>
                                 <input type="text" v-model="newRule.pattern"
-                                    class="form-control bg-dark text-white border-secondary" placeholder="例: テスト用モデル1">
-                                <div class="form-text text-muted">正規表現も使えます（大文字小文字は無視されます）</div>
+                                    class="form-control bg-dark text-white border-secondary" placeholder="キーワードなど">
+                                <div class="form-text text-muted" v-if="newRule.match_type === 'regex'">
+                                    正規表現が使えます（大文字小文字無視）</div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">付与するティア</label>
-                                <select v-model="newRule.tier" class="form-select bg-dark text-white border-secondary">
+                                <label class="form-label d-block">供給ティア</label>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="followAppTier"
+                                        v-model="newRule.tier_mode" true-value="follow_app" false-value="fixed">
+                                    <label class="form-check-label" for="followAppTier">申請されたプランを優先</label>
+                                </div>
+                                <select v-model="newRule.tier" class="form-select bg-dark text-white border-secondary"
+                                    :disabled="newRule.tier_mode === 'follow_app'">
                                     <option value="Pro">Pro</option>
                                     <option value="Pro+">Pro+</option>
+                                    <option value="Trial Pro">Trial Pro</option>
+                                    <option value="Trial Pro+">Trial Pro+</option>
                                 </select>
                             </div>
                             <div class="mb-3">

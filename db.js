@@ -147,10 +147,12 @@ async function initDB() {
         `,
       auto_approval_rules: `
           id SERIAL PRIMARY KEY,
-          pattern TEXT NOT NULL,
+          pattern TEXT, -- Optional for name_match
           tier VARCHAR(50) NOT NULL,
           duration_months INTEGER DEFAULT 1,
           duration_days INTEGER,
+          match_type VARCHAR(50) DEFAULT 'regex', -- regex, exact, name_match
+          tier_mode VARCHAR(50) DEFAULT 'fixed', -- fixed, follow_app
           is_active BOOLEAN DEFAULT TRUE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         `,
@@ -181,6 +183,11 @@ async function initDB() {
       operation_logs: [
         ['target_name', 'VARCHAR(255)'],
         ['metadata', 'JSONB']
+      ],
+      auto_approval_rules: [
+        ['match_type', "VARCHAR(50) DEFAULT 'regex'"],
+        ['tier_mode', "VARCHAR(50) DEFAULT 'fixed'"],
+        ['pattern', 'TEXT']
       ]
     };
 

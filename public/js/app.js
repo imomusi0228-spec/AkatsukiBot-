@@ -35,7 +35,7 @@ createApp({
         const staffList = ref([]);
         const automationRules = ref([]);
         const apiKeys = ref([]);
-        const newRule = reactive({ pattern: '', tier: 'Pro', duration_months: 1, duration_days: null });
+        const newRule = reactive({ pattern: '', tier: 'Pro', duration_months: 1, duration_days: null, match_type: 'regex', tier_mode: 'fixed' });
         const newApiKeyName = ref('');
 
         const importPreview = ref([]);
@@ -431,9 +431,14 @@ createApp({
         };
 
         const addAutomationRule = async () => {
-            if (!newRule.pattern) return alert('パターンを入力してな');
+            if (newRule.match_type !== 'name_match' && !newRule.pattern) {
+                return alert('パターンを入力してな');
+            }
             await api('/automations/rules', 'POST', newRule);
+            // Reset to defaults
             newRule.pattern = '';
+            newRule.match_type = 'regex';
+            newRule.tier_mode = 'fixed';
             loadData();
         };
 

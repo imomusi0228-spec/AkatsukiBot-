@@ -78,7 +78,7 @@ async function saveApplication(appData) {
         });
 
         // Check for Auto-Approval rules
-        const ruleCheck = await checkAutoApproval(boothName, content);
+        const ruleCheck = await checkAutoApproval(boothName, content, authorName);
         if (ruleCheck) {
             console.log(`[AppService] Auto-approval triggered for App ID: ${resultId}`);
             await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Auto)', true);
@@ -95,12 +95,34 @@ async function saveApplication(appData) {
 /**
  * Checks if an application matches any auto-approval rules.
  */
-async function checkAutoApproval(boothName, content) {
+async function checkAutoApproval(boothName, content, authorName = '') {
     try {
         const rules = await db.query('SELECT * FROM auto_approval_rules WHERE is_active = TRUE');
         for (const rule of rules.rows) {
-            const pattern = new RegExp(rule.pattern, 'i');
-            if (pattern.test(boothName) || pattern.test(content)) {
+            const matchType = rule.match_type || 'regex';
+            let isMatch = false;
+
+            if (matchType === 'name_match') {
+                // Check if authorName exactly matches boothName (case-insensitive)
+                if (authorName && boothName && authorName.toLowerCase().trim() === boothName.toLowerCase().trim()) {
+                    isMatch = true;
+                }
+            } else if (matchType === 'exact') {
+                if (boothName && boothName.toLowerCase().trim() === (rule.pattern || '').toLowerCase().trim()) {
+                    isMatch = true;
+                }
+            } else {
+                // Default: regex
+                const pattern = new RegExp(rule.pattern, 'i');
+                if (pattern.test(boothName) || pattern.test(content)) {
+                    isMatch = true;
+                }
+            }
+
+            if (isMatch) {
+                // Extra safety: If tier_mode is follow_app, ensure we actually have a valid tier
+                // If the app tier is missing or "Free", we might want to skip auto-approval
+                // This will be handled in approveApplication, but we could return null here too.
                 return rule;
             }
         }
@@ -125,9 +147,14 @@ async function approveApplication(appId, operatorId, operatorName, isAuto = fals
 
     // Check if it was auto-approved and use rule settings if available
     if (isAuto) {
-        const rule = await checkAutoApproval(app.parsed_booth_name, app.content);
+        const rule = await checkAutoApproval(app.parsed_booth_name, app.content, app.author_name);
         if (rule) {
-            tier = rule.tier;
+            // Priority: If tier_mode is follow_app, use app.parsed_tier
+            if (rule.tier_mode === 'follow_app' && app.parsed_tier && app.parsed_tier !== 'Free') {
+                tier = app.parsed_tier;
+            } else {
+                tier = rule.tier;
+            }
             durationMonths = rule.duration_months;
             durationDays = rule.duration_days;
         }

@@ -19,14 +19,14 @@ router.get('/rules', authMiddleware, async (req, res) => {
 
 // Add a rule
 router.post('/rules', authMiddleware, async (req, res) => {
-    const { pattern, tier, duration_months, duration_days } = req.body;
-    if (!pattern || !tier) return res.status(400).json({ error: 'Missing required fields' });
+    const { pattern, tier, duration_months, duration_days, match_type, tier_mode } = req.body;
+    if (!tier) return res.status(400).json({ error: 'Missing tier' });
 
     try {
         await db.query(`
-            INSERT INTO auto_approval_rules (pattern, tier, duration_months, duration_days)
-            VALUES ($1, $2, $3, $4)
-        `, [pattern, tier, duration_months || 1, duration_days || null]);
+            INSERT INTO auto_approval_rules (pattern, tier, duration_months, duration_days, match_type, tier_mode)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        `, [pattern || '', tier, duration_months || 1, duration_days || null, match_type || 'regex', tier_mode || 'fixed']);
 
         res.json({ success: true });
     } catch (err) {
