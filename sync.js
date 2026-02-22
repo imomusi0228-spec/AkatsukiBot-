@@ -79,6 +79,7 @@ async function updateMemberRoles(guild, userId, tier) {
  */
 async function syncSubscriptions(client) {
     console.log('Starting subscription sync...');
+    const ROLES = await getDynamicRoles();
 
     const guild = await client.guilds.fetch(SUPPORT_GUILD_ID).catch(console.error);
     if (!guild) {
@@ -106,7 +107,6 @@ async function syncSubscriptions(client) {
     let updatedCount = 0;
     let errors = [];
 
-    const ROLES = await getDynamicRoles();
     for (const [memberId, member] of members) {
         let tier = 'Free';
         if (member.roles.cache.has(ROLES['Pro+']) || member.roles.cache.has(ROLES['ProPlusYearly']) || member.roles.cache.has(ROLES['ProPlusMonthly'])) {
