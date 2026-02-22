@@ -148,11 +148,10 @@ router.get('/callback', async (req, res) => {
             [sessionId, user.id, user.username, user.avatar, user.discriminator, expiry]
         );
 
-        const isProduction = process.env.NODE_ENV === 'production';
-        // Relaxing secure flag slightly to ensure compatibility, but still favoring HTTPS if detected
-        const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https' || (isProduction && PUBLIC_URL.startsWith('https'));
+        // Relaxing Secure temporarily to confirm if it identifies the loop cause
+        const isSecure = false;
 
-        console.log(`[OAuth] Setting cookies for user ${user.id}. isSecure: ${isSecure}`);
+        console.log(`[OAuth] Setting cookies for user ${user.id}. isSecure: ${isSecure} (RELAXED)`);
 
         res.cookie('session_id', sessionId, {
             httpOnly: true,
@@ -236,10 +235,9 @@ router.get('/status', async (req, res) => {
             console.error('[Auth Status] Database error:', err);
         }
     } else {
+        console.warn('[Auth Status] No session_id cookie sent by browser.');
         if (hasCookies) {
-            console.warn('[Auth Status] session_id cookie missing, but other cookies found:', Object.keys(req.cookies));
-        } else {
-            // console.warn('[Auth Status] No cookies sent by browser.');
+            console.warn('[Auth Status] Other cookies found:', Object.keys(req.cookies));
         }
     }
     res.json({ authenticated: false });

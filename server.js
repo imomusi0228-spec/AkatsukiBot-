@@ -9,6 +9,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.set('trust proxy', 1);
+app.use(cookieParser());
 
 // Security Headers
 app.use(helmet({
@@ -36,8 +38,6 @@ const limiter = rateLimit({
 app.use('/api/', limiter); // Apply to API routes
 
 app.use(express.static('public'));
-app.set('trust proxy', 1); // Render/Cloudflareのプロキシを信頼する
-app.use(cookieParser());
 
 // Health Check Endpoint (Keep-Alive)
 app.get('/health', (req, res) => res.sendStatus(200));
