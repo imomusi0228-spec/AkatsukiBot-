@@ -121,11 +121,16 @@ router.get('/callback', async (req, res) => {
 
         // --- Whitelist Check ---
         const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
-        // Also allow if ADMIN_TOKEN is used (handled in middleware, but here we are login via Discord)
-        // If ADMIN_DISCORD_IDS is not set, we might want to default to blocking or allowing only the owner?
-        // For now, if the list is empty, we warn but might block.
-        // Let's strictly enforce:
-        if (allowedIds.length > 0 && !allowedIds.includes(user.id)) {
+        const isEnvAllowed = allowedIds.length > 0 && allowedIds.includes(user.id);
+
+        // Check database for staff entry if not in env whitelist
+        let isDbAllowed = false;
+        if (!isEnvAllowed) {
+            const staffCheck = await db.query('SELECT 1 FROM staff_permissions WHERE user_id = $1', [user.id]);
+            isDbAllowed = staffCheck.rows.length > 0;
+        }
+
+        if (!isEnvAllowed && !isDbAllowed) {
             console.warn(`[OAuth] Access denied for user ID: ${user.id} (${user.username}). Not in valid list.`);
             return res.status(403).send('<h1>403 Forbidden</h1><p>You are not authorized to access this dashboard.</p><a href="/">Return to Home</a>');
         }
