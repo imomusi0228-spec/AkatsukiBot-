@@ -148,10 +148,10 @@ router.get('/callback', async (req, res) => {
             [sessionId, user.id, user.username, user.avatar, user.discriminator, expiry]
         );
 
-        // Relaxing Secure temporarily to confirm if it identifies the loop cause
-        const isSecure = false;
+        const isProduction = process.env.NODE_ENV === 'production';
+        const isSecure = (isProduction && (req.secure || req.headers['x-forwarded-proto'] === 'https' || PUBLIC_URL.startsWith('https')));
 
-        console.log(`[OAuth] Setting cookies for user ${user.id}. isSecure: ${isSecure} (RELAXED)`);
+        console.log(`[OAuth] Setting cookies for user ${user.id}. isSecure: ${isSecure} (FORCED)`);
 
         res.cookie('session_id', sessionId, {
             httpOnly: true,
@@ -161,7 +161,6 @@ router.get('/callback', async (req, res) => {
             sameSite: 'Lax'
         });
 
-        // CSRF Token (Double Submit Cookie Pattern)
         const csrfToken = crypto.randomBytes(32).toString('hex');
         res.cookie('csrf_token', csrfToken, {
             httpOnly: false,
@@ -235,11 +234,9 @@ router.get('/status', async (req, res) => {
             console.error('[Auth Status] Database error:', err);
         }
     } else {
-        console.warn('[Auth Status] No session_id cookie sent by browser.');
-        if (hasCookies) {
-            console.warn('[Auth Status] Other cookies found:', Object.keys(req.cookies));
-        }
+        console.warn(`[Auth Status] session_id cookie missing. Browser cookies: ${JSON.stringify(req.cookies)}`);
     }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({ authenticated: false });
 });
 

@@ -88,7 +88,12 @@ createApp({
             const token = localStorage.getItem('admin_token');
             if (token) headers['Authorization'] = token;
 
-            const res = await fetch(`/api${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : null });
+            const res = await fetch(`/api${endpoint}`, {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : null,
+                credentials: 'same-origin'
+            });
             if (res.status === 401 || res.status === 403) {
                 if (res.status === 403) alert('権限がありません。');
                 user.value = null;

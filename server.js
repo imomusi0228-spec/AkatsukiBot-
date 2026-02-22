@@ -12,7 +12,16 @@ app.use(express.json());
 app.set('trust proxy', 1);
 app.use(cookieParser());
 
-// Security Headers
+// DEBUG: Global Request Logger
+app.use((req, res, next) => {
+    if (!req.path.startsWith('/css') && !req.path.startsWith('/js') && !req.path.includes('.png')) {
+        console.log(`[REQ] ${req.method} ${req.path} - Cookies: ${JSON.stringify(req.cookies || {})}`);
+    }
+    next();
+});
+
+// Security Headers (TEMPORARILY DISABLED)
+/*
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -20,22 +29,23 @@ app.use(helmet({
             scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "cdn.jsdelivr.net", "unpkg.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "fonts.googleapis.com"],
             fontSrc: ["'self'", "fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "cdn.discordapp.com", "images-ext-1.discordapp.net"], // Allow Discord Avatars & Embed images
+            imgSrc: ["'self'", "data:", "cdn.discordapp.com", "images-ext-1.discordapp.net"],
             connectSrc: ["'self'"]
         }
     }
 }));
+*/
 
-
-
-// Global Rate Limiting
+// Global Rate Limiting (TEMPORARILY DISABLED)
+/*
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     standardHeaders: true,
     legacyHeaders: false,
 });
-app.use('/api/', limiter); // Apply to API routes
+app.use('/api/', limiter);
+*/
 
 app.use(express.static('public'));
 
