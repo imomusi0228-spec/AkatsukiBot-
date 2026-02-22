@@ -66,7 +66,10 @@ createApp({
 
         const checkAuth = async () => {
             try {
-                const res = await fetch('/api/auth/status');
+                // Consistency: Use the same options as api(), plus cache-busting
+                const res = await fetch('/api/auth/status?t=' + Date.now(), {
+                    credentials: 'same-origin'
+                });
                 const data = await res.json();
                 if (data.authenticated) {
                     user.value = data.user;
@@ -78,7 +81,7 @@ createApp({
                     loading.value = false;
                 }
             } catch (e) {
-                console.error(e);
+                console.error('[CheckAuth] Critical failure:', e);
                 loading.value = false;
             }
         };

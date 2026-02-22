@@ -120,8 +120,11 @@ async function authMiddleware(req, res, next) {
 
                     return next();
                 } else {
+                    console.warn(`[AuthMW] Session ${sessionId} expired at ${session.expiry}`);
                     db.query('DELETE FROM user_sessions WHERE session_id = $1', [sessionId]).catch(console.error);
                 }
+            } else {
+                console.warn(`[AuthMW] Session ${sessionId} not found in database.`);
             }
         } catch (err) {
             console.error('[AuthMW] Database error:', err);
@@ -129,8 +132,7 @@ async function authMiddleware(req, res, next) {
     } else {
         // Only log if it's an API call
         if (req.path.startsWith('/api/') && !req.path.startsWith('/api/auth/status')) {
-            const hasCookies = Object.keys(req.cookies || {}).length > 0;
-            console.warn(`[AuthMW] Unauthorized: No sessionId. Path: ${req.path}, CookiesPresent: ${hasCookies}`);
+            console.warn(`[AuthMW] Unauthorized: No sessionId. Path: ${req.path}, Cookies: ${JSON.stringify(req.cookies)}`);
         }
     }
 
