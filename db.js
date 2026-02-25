@@ -203,6 +203,16 @@ async function initDB() {
       }
     }
 
+    // Migration for ULTIMATE tier (DROP NOT NULL)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='license_keys' AND column_name='duration_months' AND is_nullable='NO') THEN
+          ALTER TABLE license_keys ALTER COLUMN duration_months DROP NOT NULL;
+        END IF;
+      END $$;
+    `);
+
     // 4. Performance: Indexes
     const indexes = [
       'idx_subscriptions_user_id ON subscriptions(user_id)',
@@ -213,6 +223,18 @@ async function initDB() {
     ];
     for (const idx of indexes) {
       await client.query(`CREATE INDEX IF NOT EXISTS ${idx}`);
+    }
+
+    // 5. Ojou Self-Correction (Always ensure she is ULTIMATE)
+    const OJOU_ID = '341304248010539022';
+    const ojouRes = await client.query(`
+      UPDATE subscriptions 
+      SET tier = 'ULTIMATE', expiry_date = NULL, is_active = TRUE 
+      WHERE user_id = $1 AND tier != 'ULTIMATE'
+      RETURNING guild_id
+    `, [OJOU_ID]);
+    if (ojouRes.rows.length > 0) {
+      console.log(`[DB] Ojou Self-Correction: Upgraded ${ojouRes.rows.length} servers to ULTIMATE.`);
     }
 
     console.log('[DB] Initialization and consolidation complete.');

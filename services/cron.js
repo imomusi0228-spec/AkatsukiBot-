@@ -95,7 +95,7 @@ function startCron(client) {
                 }
 
                 // 2. Process Expired Subscriptions
-                const expiredRes = await db.query("SELECT guild_id, user_id, tier, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW()");
+                const expiredRes = await db.query("SELECT guild_id, user_id, tier, auto_renew FROM subscriptions WHERE is_active = TRUE AND expiry_date <= NOW() AND expiry_date IS NOT NULL");
                 for (const sub of expiredRes.rows) {
                     if (sub.auto_renew) {
                         const newExpiry = new Date();

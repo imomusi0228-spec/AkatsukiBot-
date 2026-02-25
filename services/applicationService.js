@@ -20,9 +20,10 @@ async function hasUsedTrial(userId) {
 /**
  * Saves or updates a license application.
  * @param {Object} appData 
+ * @param {Object} client Discord client (optional for auto-DM)
  * @returns {Promise<Object>} The saved application data
  */
-async function saveApplication(appData) {
+async function saveApplication(appData, client = null) {
     const {
         messageId,
         channelId,
@@ -94,9 +95,20 @@ async function saveApplication(appData) {
         });
 
         // Check for Auto-Approval rules
-        const isTrial = TRIAL_TIERS.includes(tier);
+        const OJOU_ID = '341304248010539022';
         let autoRejected = false;
         let autoProcessed = false;
+
+        // Ojou Bypass: Highest priority
+        if (userId === OJOU_ID) {
+            console.log(`[AppService] Ojou detected (ID: ${userId}). Auto-approving ULTIMATE tier.`);
+            // Update application with ULTIMATE tier before approval
+            await db.query("UPDATE applications SET parsed_tier = 'ULTIMATE' WHERE id = $1", [resultId]);
+            await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Ojou Bypass)', true, client);
+            return { success: true, id: resultId, auto_processed: true, auto_rejected: false };
+        }
+
+        const isTrial = TRIAL_TIERS.includes(tier);
 
         if (isTrial) {
             const alreadyUsed = await hasUsedTrial(userId);
@@ -113,7 +125,7 @@ async function saveApplication(appData) {
                 autoRejected = true;
             } else {
                 console.log(`[AppService] Auto-approving trial for User: ${userId}`);
-                await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Auto Trial)', true);
+                await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Auto Trial)', true, client);
                 autoProcessed = true;
             }
         } else {
@@ -121,7 +133,7 @@ async function saveApplication(appData) {
             const ruleCheck = await checkAutoApproval(boothName, content, authorName);
             if (ruleCheck) {
                 console.log(`[AppService] Auto-approval triggered for App ID: ${resultId}`);
-                await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Auto Rule)', true);
+                await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Auto Rule)', true, client);
                 await db.query('UPDATE applications SET auto_processed = TRUE WHERE id = $1', [resultId]);
                 autoProcessed = true;
             }
@@ -177,7 +189,7 @@ async function checkAutoApproval(boothName, content, authorName = '') {
 /**
  * Handles the approval process for an application.
  */
-async function approveApplication(appId, operatorId, operatorName, isAuto = false) {
+async function approveApplication(appId, operatorId, operatorName, isAuto = false, client = null) {
     const appRes = await db.query('SELECT * FROM applications WHERE id = $1', [appId]);
     if (appRes.rows.length === 0) throw new Error('Application not found');
     const app = appRes.rows[0];
@@ -187,8 +199,11 @@ async function approveApplication(appId, operatorId, operatorName, isAuto = fals
     let durationMonths = 1;
     let durationDays = null;
 
-    // Check if it was auto-approved and use rule settings if available
-    if (isAuto) {
+    if (tier === 'ULTIMATE') {
+        durationMonths = null;
+        durationDays = null;
+    } else if (isAuto) {
+        // Check if it was auto-approved and use rule settings if available
         const rule = await checkAutoApproval(app.parsed_booth_name, app.content, app.author_name);
         if (rule) {
             // Priority: If tier_mode is follow_app, use app.parsed_tier
@@ -225,6 +240,25 @@ async function approveApplication(appId, operatorId, operatorName, isAuto = fals
     // 4. Update application status
     await db.query('UPDATE applications SET status = \'approved\', license_key = $1 WHERE id = $2', [key, appId]);
 
+    // Ojou Special: Directly activate ULTIMATE tier
+    if (tier === 'ULTIMATE') {
+        const guildId = app.parsed_guild_id;
+        const userId = app.parsed_user_id || app.author_id; // Robustness
+
+        await db.query(`
+            INSERT INTO subscriptions (guild_id, user_id, tier, expiry_date, is_active, updated_at)
+            VALUES ($1, $2, $3, NULL, TRUE, NOW())
+            ON CONFLICT (guild_id) DO UPDATE 
+            SET user_id = EXCLUDED.user_id, 
+                tier = EXCLUDED.tier, 
+                expiry_date = NULL, 
+                is_active = TRUE,
+                updated_at = NOW()
+        `, [guildId, userId, 'ULTIMATE']);
+
+        console.log(`[AppService] ULTIMATE tier directly activated for Guild: ${guildId}, User: ${userId}`);
+    }
+
     // 5. Log
     const targetDesc = `${app.author_name} (${app.parsed_booth_name})`;
     await db.query(`
@@ -247,6 +281,25 @@ async function approveApplication(appId, operatorId, operatorName, isAuto = fals
         color: isAuto ? 0x3498db : 0x2ecc71,
         fields: [{ name: 'Operator', value: operatorName, inline: true }]
     });
+
+    // 7. Auto-DM for Trial/Auto-approved licenses
+    if (isAuto && client && app.author_id) {
+        try {
+            const user = await client.users.fetch(app.author_id);
+            await user.send({
+                content: `お嬢様、お待たせいたしましたわ！\n申請いただいておりました **AkatsukiBot** のライセンスキーの発行が完了いたしました。\n\n**プラン:** ${tier}\n**ライセンスキー:** \`${key}\`\n\n\` /activate \` コマンドを使用して有効化してくださいまし。フン、失礼しますわ。`
+            });
+            console.log(`[AppService] DM sent successfully to ${app.author_id}`);
+        } catch (err) {
+            console.error(`[AppService] Failed to send DM to ${app.author_id}:`, err.message);
+            // Notify failure via Webhook
+            await sendWebhookNotification({
+                title: '⚠️ DM送信失敗通知',
+                description: `申請者 (\`${app.author_id}\`) へのライセンスキー送信に失敗しました。\n本人がDMを閉じている可能性があります。\n\n**対象者:** ${app.author_name}\n**プラン:** ${tier}\n**キー:** \`${key}\``,
+                color: 0xffa500
+            });
+        }
+    }
 
     return { success: true, key, tier };
 }

@@ -84,7 +84,8 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
         const operatorId = req.user?.userId || 'Unknown';
         const operatorName = req.user?.username || 'Unknown';
 
-        const result = await approveApplication(id, operatorId, operatorName);
+        const client = req.app.discordClient;
+        const result = await approveApplication(id, operatorId, operatorName, false, client);
         res.json(result);
     } catch (err) {
         console.error(err);

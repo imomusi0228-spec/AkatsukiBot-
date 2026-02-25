@@ -23,7 +23,7 @@ async function handleApplicationMessage(message, client) {
             tier: parsed.tier,
             boothName: parsed.boothName,
             sourceType: 'message'
-        });
+        }, client);
 
         await message.react('👀').catch(() => { });
     } catch (err) {
@@ -80,7 +80,7 @@ async function handleApplicationModal(interaction) {
             tier: tier,
             boothName: boothName,
             sourceType: 'modal'
-        });
+        }, interaction.client);
 
         let replyMsg = '✅ **申請を受け付けました！**\n内容を精査し、不備がなければライセンスを発行いたします。';
         if (result.auto_processed) {

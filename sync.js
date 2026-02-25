@@ -47,7 +47,7 @@ async function updateMemberRoles(guild, userId, tier) {
         ].filter(id => id); // Remove empty/null strings
 
         let rolesToAdd = [];
-        if (tier === 'Pro+' || tier === 'Trial Pro+') {
+        if (tier === 'ULTIMATE' || tier === 'Pro+' || tier === 'Trial Pro+') {
             // Favor Yearly/Specific from DB if both might exist
             rolesToAdd = [ROLES['Pro+'], ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']].filter(id => id);
         } else if (tier === 'Pro' || tier === 'Trial Pro') {
@@ -123,8 +123,8 @@ async function syncSubscriptions(client) {
                     const userName = member.user.globalName || member.user.username;
                     for (const row of res.rows) {
                         const currentTier = String(row.tier || '');
-                        // Don't downgrade Trial to regular Pro/Pro+ if it matches the intensity
-                        const isMatch = (currentTier === tier) || (currentTier === `Trial ${tier}`) ||
+                        // Don't downgrade Trial or ULTIMATE
+                        const isMatch = (currentTier === tier) || (currentTier === `Trial ${tier}`) || (currentTier === 'ULTIMATE') ||
                             (tier === 'Pro' && (currentTier === '1' || currentTier === '2')) ||
                             (tier === 'Pro+' && (currentTier === '3' || currentTier === '4'));
 

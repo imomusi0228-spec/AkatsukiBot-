@@ -118,8 +118,10 @@ module.exports = async (interaction) => {
         }
 
         // Calculate expiry
-        const exp = new Date();
-        if (durationDays) {
+        let exp = new Date();
+        if (tier === 'ULTIMATE') {
+            exp = null;
+        } else if (durationDays) {
             exp.setDate(exp.getDate() + durationDays);
         } else {
             exp.setMonth(exp.getMonth() + durationMonths);
