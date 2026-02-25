@@ -39,9 +39,10 @@ function startCron(client) {
                         SELECT guild_id, user_id, tier, expiry_date, auto_renew 
                         FROM subscriptions 
                         WHERE is_active = TRUE 
+                        AND expiry_date IS NOT NULL
                         AND expiry_date <= NOW() + INTERVAL '7 days' 
                         AND expiry_warning_sent = FALSE 
-                        AND tier NOT IN ('Free', '0')
+                        AND tier NOT IN ('Free', '0', 'ULTIMATE')
                         AND tier NOT LIKE 'Trial%'
                     `);
 
@@ -49,6 +50,7 @@ function startCron(client) {
                         SELECT guild_id, user_id, tier, expiry_date, auto_renew 
                         FROM subscriptions 
                         WHERE is_active = TRUE 
+                        AND expiry_date IS NOT NULL
                         AND expiry_date <= NOW() + INTERVAL '1 day' 
                         AND expiry_warning_sent = FALSE 
                         AND tier LIKE 'Trial%'

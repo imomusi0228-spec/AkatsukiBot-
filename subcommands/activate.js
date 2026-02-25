@@ -157,7 +157,8 @@ module.exports = async (interaction) => {
             }
         }
 
-        await interaction.editReply({ content: `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${exp.toLocaleDateString()}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
+        const expiryText = exp ? exp.toLocaleDateString() : '無期限 (ULTIMATE)';
+        await interaction.editReply({ content: `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryText}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
 
     } catch (err) {
         console.error(err);
