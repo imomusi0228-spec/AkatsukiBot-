@@ -50,9 +50,23 @@ router.get('/', authMiddleware, async (req, res) => {
                         const guild = client.guilds.cache.get(sId) || await client.guilds.fetch(sId).catch(() => null);
                         if (guild) serverName = guild.name;
                     }
+
+                    let userAvatarHash = null;
+                    let userHandle = null;
                     if (sub.user_id && !sub.cached_username) {
                         const user = client.users.cache.get(sub.user_id) || await client.users.fetch(sub.user_id).catch(() => null);
-                        if (user) userName = user.globalName || user.username;
+                        if (user) {
+                            userName = user.globalName || user.username;
+                            userAvatarHash = user.avatar;
+                            userHandle = user.username;
+                        }
+                    } else if (sub.user_id) {
+                        // Already have username cached; try to get avatar from cache only (no extra API call)
+                        const cachedUser = client.users.cache.get(sub.user_id);
+                        if (cachedUser) {
+                            userAvatarHash = cachedUser.avatar;
+                            userHandle = cachedUser.username;
+                        }
                     }
 
                     // Async background update for cache if it was empty, but don't await it
@@ -61,7 +75,7 @@ router.get('/', authMiddleware, async (req, res) => {
                     }
                 } catch (e) { }
 
-                return { ...sub, server_name: serverName, user_display_name: userName };
+                return { ...sub, server_name: serverName, user_display_name: userName, user_avatar: userAvatarHash, user_handle: userHandle };
             }));
             res.json({ data: enrichedSubs, pagination: { total: totalCount, page, limit, pages: Math.ceil(totalCount / limit) } });
         } else {
