@@ -89,6 +89,11 @@ routes.forEach(route => {
 
 function startServer(client) {
     app.discordClient = client;
+
+    // 起動時に履歴を同期する（非同期で並行実行）
+    const syncOnBoot = require('./scripts/sync_on_boot');
+    syncOnBoot(client).catch(err => console.error('[Server] SyncOnBoot failed:', err));
+
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`Web Server running on port ${PORT}`);
     });
