@@ -7,11 +7,30 @@ const pool = new Pool({
   },
   max: 20, // Increased max connections
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // Increased from 2000 to 10000ms
 });
 
 async function initDB() {
-  const client = await pool.connect();
+  let client;
+  let retries = 5;
+  let delay = 3000;
+
+  while (retries > 0) {
+    try {
+      client = await pool.connect();
+      break; // Success
+    } catch (err) {
+      retries--;
+      if (retries === 0) {
+        console.error('[DB] Final connection attempt failed. No retries left.');
+        throw err;
+      }
+      console.warn(`[DB] Connection failed. Retrying in ${delay / 1000}s... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 1.5; // Exponential backoff
+    }
+  }
+
   try {
     // 1. Initial Migrations (Legacy field normalization)
     // server_id -> guild_id, plan_tier -> tier
