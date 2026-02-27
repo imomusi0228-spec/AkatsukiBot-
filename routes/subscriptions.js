@@ -44,6 +44,9 @@ router.get('/', authMiddleware, async (req, res) => {
                 let serverName = sub.cached_servername || sId;
                 let userName = sub.cached_username || sub.user_id || 'Unknown User';
 
+                let userAvatarHash = null;
+                let userHandle = null;
+
                 // Only fetch from API if not in cache OR name is missing
                 try {
                     if (sId && !sub.cached_servername) {
@@ -51,8 +54,6 @@ router.get('/', authMiddleware, async (req, res) => {
                         if (guild) serverName = guild.name;
                     }
 
-                    let userAvatarHash = null;
-                    let userHandle = null;
                     if (sub.user_id && !sub.cached_username) {
                         const user = client.users.cache.get(sub.user_id) || await client.users.fetch(sub.user_id).catch(() => null);
                         if (user) {
