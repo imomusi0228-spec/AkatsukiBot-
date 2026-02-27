@@ -1127,8 +1127,17 @@
                                     }}
                                 </div>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted small">解析: Booth注文番号</label>
+                                <div class="form-control-plaintext text-accent fw-bold">{{
+                                    appDetailsModal.data.booth_order_id || '未入力' }}</div>
+                            </div>
                         </div>
                         <div class="modal-footer">
+                            <button v-if="appDetailsModal.data.status === 'approved'" type="button"
+                                class="btn btn-outline-warning" @click="reissueKey(appDetailsModal.data)">
+                                <i class="bi bi-arrow-repeat"></i> キー再発行
+                            </button>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
                         </div>
                     </div>

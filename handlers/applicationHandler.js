@@ -58,6 +58,7 @@ async function handleApplicationModal(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const boothName = interaction.fields.getTextInputValue('booth_name');
+    const boothOrderId = interaction.fields.getTextInputValue('booth_order_id') || null;
     const userId = interaction.fields.getTextInputValue('user_id');
     const guildId = interaction.fields.getTextInputValue('guild_id');
     const tierRaw = interaction.customId.split(':')[1] || 'Pro';
@@ -79,6 +80,7 @@ async function handleApplicationModal(interaction) {
             guildId: guildId,
             tier: tier,
             boothName: boothName,
+            boothOrderId: boothOrderId,
             sourceType: 'modal'
         }, interaction.client);
 

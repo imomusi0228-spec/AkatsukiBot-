@@ -158,7 +158,14 @@ module.exports = async (interaction) => {
         }
 
         const expiryText = exp ? exp.toLocaleDateString() : '無期限 (ULTIMATE)';
-        await interaction.editReply({ content: `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryText}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。` });
+        const portalUrl = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/portal.html` : null;
+        let successMsg = `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryText}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。`;
+
+        if (portalUrl) {
+            successMsg += `\n\n🌐 **ポータルで管理:**\n${portalUrl}`;
+        }
+
+        await interaction.editReply({ content: successMsg });
 
     } catch (err) {
         console.error(err);

@@ -225,4 +225,62 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// Reissue key (A-1)
+router.post('/:id/reissue', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const appRes = await db.query('SELECT author_name, author_id, parsed_booth_name, license_key, parsed_tier FROM applications WHERE id = $1', [id]);
+        if (appRes.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        const app = appRes.rows[0];
+
+        if (!app.license_key) {
+            return res.status(400).json({ error: 'No key has been issued for this application yet' });
+        }
+
+        // 1. Invalidate old key
+        await db.query('UPDATE license_keys SET is_used = TRUE, notes = $1 WHERE key_id = $2',
+            [`Reissued at ${new Date().toISOString()}`, app.license_key]);
+
+        // 2. Generate and issue new key
+        const crypto = require('crypto');
+        const randomBuffer = crypto.randomBytes(4);
+        const newKey = `AK-${randomBuffer.toString('hex').toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+        // We reuse the same tier and duration logic from the original issue (simplified here)
+        await db.query(`
+            INSERT INTO license_keys (key_id, tier, duration_months, reserved_user_id, notes)
+            VALUES ($1, $2, $3, $4, $5)
+        `, [newKey, app.parsed_tier || 'Pro', 1, app.author_id, `Reissued key for App ID: ${id}`]);
+
+        // 3. Update application
+        await db.query('UPDATE applications SET license_key = $1 WHERE id = $2', [newKey, id]);
+
+        // 4. Log
+        const operatorId = req.user?.userId || 'Unknown';
+        const operatorName = req.user?.username || 'Unknown';
+        await db.query(`
+            INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details)
+            VALUES ($1, $2, $3, $4, 'REISSUE_KEY', $5)
+        `, [operatorId, operatorName, id, `${app.author_name} (${app.parsed_booth_name})`, `Reissued key: ${newKey}`]);
+
+        // 5. Send DM
+        const client = req.app.discordClient;
+        if (client && app.author_id) {
+            try {
+                const user = await client.users.fetch(app.author_id);
+                await user.send({
+                    content: `お嬢様、ライセンスキーの再発行を承りましたわ！\n以前のキーは無効化いたしましたので、こちらの新しいキーをご使用くださいまし。\n\n**新しいライセンスキー:** \`${newKey}\`\n\n\` /activate \` コマンドで有効化をお願いします。`
+                });
+            } catch (dmErr) {
+                console.warn(`[Reissue] Failed to DM user ${app.author_id}:`, dmErr.message);
+            }
+        }
+
+        res.json({ success: true, newKey });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 module.exports = router;

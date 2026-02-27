@@ -34,6 +34,7 @@ async function saveApplication(appData, client = null) {
         guildId,
         tier,
         boothName,
+        boothOrderId,   // S-3: Booth注文番号
         sourceType // 'message' or 'modal'
     } = appData;
 
@@ -56,29 +57,47 @@ async function saveApplication(appData, client = null) {
                     content = $5,
                     parsed_tier = $6,
                     parsed_booth_name = $7,
+                    booth_order_id = $8,
                     status = 'pending',
                     created_at = CURRENT_TIMESTAMP
-                WHERE id = $8
+                WHERE id = $9
             `, [
                 messageId, channelId, authorId, authorName, content,
-                tier, boothName, resultId
+                tier, boothName, boothOrderId || null, resultId
             ]);
             console.log(`[AppService] Existing application updated (ID: ${resultId}, Source: ${sourceType})`);
         } else {
+            // S-3: Booth注文番号の重複チェック
+            if (boothOrderId) {
+                const dupCheck = await db.query(
+                    "SELECT id FROM applications WHERE booth_order_id = $1 AND status = 'approved'",
+                    [boothOrderId]
+                );
+                if (dupCheck.rows.length > 0) {
+                    console.warn(`[AppService] Duplicate booth_order_id detected: ${boothOrderId}`);
+                    await sendWebhookNotification({
+                        title: '⚠️ 注文番号重複警告',
+                        description: `**申請者:** ${authorName} (\`${authorId}\`)\n**注文番号:** \`${boothOrderId}\`\n\nこの注文番号は既に承認済みの申請が存在します。要確認。`,
+                        color: 0xff8c00
+                    });
+                }
+            }
+
             const res = await db.query(`
                 INSERT INTO applications (
                     message_id, channel_id, author_id, author_name, content,
-                    parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    parsed_user_id, parsed_guild_id, parsed_tier, parsed_booth_name, booth_order_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 ON CONFLICT (message_id) DO NOTHING
                 RETURNING id
             `, [
                 messageId, channelId, authorId, authorName, content,
-                userId, guildId, tier, boothName
+                userId, guildId, tier, boothName, boothOrderId || null
             ]);
             resultId = res.rows[0]?.id;
             console.log(`[AppService] New application saved (Source: ${sourceType})`);
         }
+
 
         // Notify admins via webhook
         const dashboardUrl = `${process.env.PUBLIC_URL || ''}/#apps`;
@@ -282,22 +301,38 @@ async function approveApplication(appId, operatorId, operatorName, isAuto = fals
         fields: [{ name: 'Operator', value: operatorName, inline: true }]
     });
 
-    // 7. Auto-DM for Trial/Auto-approved licenses
-    if (isAuto && client && app.author_id) {
+    // 7. Send DM to User (A-3)
+    if (client) {
         try {
-            const user = await client.users.fetch(app.author_id);
-            await user.send({
-                content: `お嬢様、お待たせいたしましたわ！\n申請いただいておりました **AkatsukiBot** のライセンスキーの発行が完了いたしました。\n\n**プラン:** ${tier}\n**ライセンスキー:** \`${key}\`\n\n\` /activate \` コマンドを使用して有効化してくださいまし。フン、失礼しますわ。`
-            });
-            console.log(`[AppService] DM sent successfully to ${app.author_id}`);
-        } catch (err) {
-            console.error(`[AppService] Failed to send DM to ${app.author_id}:`, err.message);
-            // Notify failure via Webhook
-            await sendWebhookNotification({
-                title: '⚠️ DM送信失敗通知',
-                description: `申請者 (\`${app.author_id}\`) へのライセンスキー送信に失敗しました。\n本人がDMを閉じている可能性があります。\n\n**対象者:** ${app.author_name}\n**プラン:** ${tier}\n**キー:** \`${key}\``,
-                color: 0xffa500
-            });
+            const user = await client.users.fetch(app.author_id).catch(() => null);
+            if (user) {
+                const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+                const portalUrl = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/portal.html` : null;
+
+                const welcomeEmbed = {
+                    title: '🎉 ライセンス承認のお知らせ',
+                    description: `ご利用ありがとうございます！\n申請いただいたライセンスが承認されました。\n\n**プラン:** ${tier}\n**キー:** \`${key}\`\n\n以下のコマンドでライセンスを有効化してください：\n\`/license activate key:${key}\``,
+                    color: 0x2ecc71,
+                    footer: { text: 'Akatsuki License System' },
+                    timestamp: new Date().toISOString()
+                };
+
+                const components = [];
+                if (portalUrl) {
+                    components.push(new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setLabel('ポータルで管理する')
+                            .setURL(portalUrl)
+                            .setStyle(ButtonStyle.Link)
+                    ));
+                }
+
+                await user.send({ embeds: [welcomeEmbed], components }).catch(err => {
+                    console.warn(`[AppService] Failed to send DM to ${app.author_id}:`, err.message);
+                });
+            }
+        } catch (dmErr) {
+            console.error('[AppService] DM error:', dmErr);
         }
     }
 

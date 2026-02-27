@@ -400,6 +400,21 @@ createApp({
             }
         };
 
+        const reissueKey = async (app) => {
+            if (!confirm('キーを再発行しますか？現在のキーは無効化され、新しいキーがユーザーにDM送信されます。')) return;
+            try {
+                const res = await api(`/applications/${app.id}/reissue`, 'POST');
+                if (res.success) {
+                    alert('新しいキーを発行し、ユーザーに通知しました。');
+                    loadData();
+                } else {
+                    alert('再発行失敗: ' + (res.error || '不明なエラー'));
+                }
+            } catch (err) {
+                alert('エラーが発生しました: ' + err.message);
+            }
+        };
+
         const deleteApp = async (id) => {
             if (!confirm('削除しますか？')) return;
             await api(`/applications/${id}`, 'DELETE');
@@ -879,7 +894,7 @@ createApp({
             editModal, addModal, keyModal, appDetailsModal,
             formatDate, deactivateSub, resumeSub, hardDeleteSub, toggleAutoRenew, copyText,
             openEditModal, saveEdit, updateTier, createSub,
-            approveApp, deleteApp, openAppDetails, loginWithToken, logout,
+            approveApp, reissueKey, deleteApp, openAppDetails, loginWithToken, logout,
             loadData, changePage, search, showOverallPie,
             announceModal, sendAnnouncement, loadLogs, updateSetting, testWebhook,
             toggleSelectAll, bulkDeactivate,

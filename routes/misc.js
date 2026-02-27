@@ -146,11 +146,11 @@ router.delete('/announce/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// POST /api/updates/receive (新設: メインBotからのアプデ情報受信)
+// POST /api/updates/receive (メインBotからのアプデ情報受信)
 router.post('/updates/receive', async (req, res) => {
-    const { title, content, token } = req.body;
+    const { title, content, color, token, scheduled_at } = req.body;
+    const client = req.app.discordClient;
 
-    // 簡単なトークン認証
     if (!token || token !== process.env.ADMIN_TOKEN) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -160,14 +160,89 @@ router.post('/updates/receive', async (req, res) => {
     }
 
     try {
+        if (scheduled_at) {
+            // 時間指定がある場合は予約テーブルへ
+            await db.query(
+                'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks, is_draft) VALUES ($1, $2, $3, $4, $5, $6)',
+                [title, content, 'normal', scheduled_at, JSON.stringify([]), false]
+            );
+            return res.json({ success: true, message: `Update scheduled at ${scheduled_at}` });
+        }
+
+        // 即時送信
+        const channelId = process.env.ANNOUNCEMENT_CHANNEL_ID;
+        if (!channelId) {
+            return res.status(500).json({ error: 'Announcement channel ID not configured' });
+        }
+
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (!channel) {
+            return res.status(404).json({ error: 'Announcement channel not found' });
+        }
+
+        const embed = {
+            author: {
+                name: 'AkatsukiBot Update System',
+                icon_url: 'https://cdn.discordapp.com/emojis/1150654483737526312.png'
+            },
+            title: `🚀 ${title}`,
+            description: content,
+            color: color || 0x00ff00, // 送信側指定の色を優先
+            timestamp: new Date().toISOString(),
+            footer: {
+                text: `AkatsukiBot | Official Announcement`,
+                icon_url: client.user.displayAvatarURL()
+            }
+        };
+
+        await channel.send({ embeds: [embed] });
+
+        // 履歴として保存（送信済みとして）
         await db.query(
-            'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks, is_draft) VALUES ($1, $2, $3, $4, $5, $6)',
-            [title, content, 'normal', new Date(), JSON.stringify([]), true]
+            'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, sent_at, is_draft) VALUES ($1, $2, $3, $4, $5, $6)',
+            [title, content, 'normal', new Date(), new Date(), false]
         );
 
-        res.json({ success: true, message: 'Update draft received' });
+        res.json({ success: true, message: 'Update posted immediately' });
     } catch (err) {
-        console.error('[Updates] Failed to receive:', err);
+        console.error('[Updates] Failed to process receive:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/updates/reset (チャンネル内のお知らせを全削除)
+router.post('/updates/reset', async (req, res) => {
+    const { token } = req.body;
+    const client = req.app.discordClient;
+
+    if (!token || token !== process.env.ADMIN_TOKEN) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const channelId = process.env.ANNOUNCEMENT_CHANNEL_ID;
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (!channel) return res.status(404).json({ error: 'Channel not found' });
+
+        console.log(`[Updates] Resetting announcement channel: ${channel.name}`);
+
+        // メッセージを取得して削除（ボット自身のものだけ）
+        let messages = await channel.messages.fetch({ limit: 100 });
+        let deletedCount = 0;
+
+        for (const msg of messages.values()) {
+            if (msg.author.id === client.user.id) {
+                await msg.delete().catch(() => { });
+                deletedCount++;
+            }
+        }
+
+        // DBの履歴もクリア
+        await db.query("DELETE FROM scheduled_announcements WHERE sent_at IS NOT NULL");
+
+        res.json({ success: true, message: `Deleted ${deletedCount} messages and cleared history.` });
+    } catch (err) {
+        console.error('[Updates] Reset failed:', err);
         res.status(500).json({ error: err.message });
     }
 });

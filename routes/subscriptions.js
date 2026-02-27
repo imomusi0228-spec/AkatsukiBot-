@@ -467,10 +467,35 @@ router.put('/:id', authMiddleware, async (req, res) => {
                 if (guild) await updateMemberRoles(guild, subData.user_id, tier);
             }
         } else if (action === 'toggle_active') {
-            const currentSub = await db.query('SELECT cached_servername FROM subscriptions WHERE guild_id = $1', [id]);
-            const serverName = currentSub.rows[0]?.cached_servername || id;
+            const currentSub = await db.query('SELECT cached_servername, tier, paused_at, paused_tier, expiry_date FROM subscriptions WHERE guild_id = $1', [id]);
+            if (currentSub.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+            const subData = currentSub.rows[0];
+            const serverName = subData.cached_servername || id;
 
-            await db.query('UPDATE subscriptions SET is_active = $1 WHERE guild_id = $2', [is_active, id]);
+            if (!is_active) {
+                // 【停止処理】paused_atを記録、paused_tierに現在のtierを保存、tierをFreeに降格
+                if (subData.paused_at) {
+                    return res.status(400).json({ error: 'Already paused' });
+                }
+                await db.query(`
+                    UPDATE subscriptions
+                    SET is_active = FALSE, paused_at = NOW(), paused_tier = tier, tier = 'Free', updated_at = NOW()
+                    WHERE guild_id = $1
+                `, [id]);
+            } else {
+                // 【再開処理】停止期間分を期限に加算、元のtierを復元
+                let newExpiry = subData.expiry_date ? new Date(subData.expiry_date) : null;
+                if (subData.paused_at && newExpiry) {
+                    const pausedMs = Date.now() - new Date(subData.paused_at).getTime();
+                    newExpiry = new Date(newExpiry.getTime() + pausedMs);
+                }
+                const restoredTier = subData.paused_tier || subData.tier;
+                await db.query(`
+                    UPDATE subscriptions
+                    SET is_active = TRUE, paused_at = NULL, paused_tier = NULL, tier = $1, expiry_date = $2, updated_at = NOW()
+                    WHERE guild_id = $3
+                `, [restoredTier, newExpiry, id]);
+            }
 
             // Log
             await db.query(`INSERT INTO operation_logs (operator_id, operator_name, target_id, target_name, action_type, details, metadata) VALUES ($1, $2, $3, $4, 'TOGGLE_ACTIVE', $5, $6)`,
@@ -479,7 +504,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             // Notify
             await sendWebhookNotification({
                 title: is_active ? 'License Resumed' : 'License Suspended',
-                description: `**Server:** ${serverName} (\`${id}\`)`,
+                description: `**Server:** ${serverName} (\`${id}\`)${!is_active ? '\n*一時停止中: Free扱いに降格。再開時に期限を自動延長します。*' : '\n*再開済: 元プランを復元し、停止期間分の期限を延長しました。*'}`,
                 color: is_active ? 0x2ecc71 : 0xe67e22,
                 fields: [{ name: 'Operator', value: operatorName, inline: true }]
             });

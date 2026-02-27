@@ -173,7 +173,12 @@ async function initDB() {
       subscriptions: [
         ['updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
         ['migration_count', 'INTEGER DEFAULT 0'],
-        ['last_migration_at', 'TIMESTAMP']
+        ['last_migration_at', 'TIMESTAMP'],
+        ['paused_at', 'TIMESTAMP'],
+        ['paused_tier', 'VARCHAR(50)']
+      ],
+      applications: [
+        ['booth_order_id', 'VARCHAR(255)']
       ],
       scheduled_announcements: [
         ['associated_tasks', "JSONB DEFAULT '[]'"],

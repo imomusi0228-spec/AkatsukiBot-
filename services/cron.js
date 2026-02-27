@@ -163,17 +163,54 @@ function startCron(client) {
             }
         }
 
-        if (now.getHours() === 0 && now.getMinutes() === 5) {
+        // 5. Monthly Statistics Report (A-2)
+        if (now.getDate() === 1 && now.getHours() === 9 && now.getMinutes() === 0) {
+            console.log('[Cron] Generating monthly statistics report...');
             try {
-                const activeSubs = await db.query('SELECT guild_id FROM subscriptions WHERE is_active = TRUE');
-                for (const sub of activeSubs.rows) {
-                    const guild = await client.guilds.fetch(sub.guild_id).catch(() => null);
-                    if (guild) {
-                        await db.query('INSERT INTO guild_member_snapshots (guild_id, member_count) VALUES ($1, $2)', [sub.guild_id, guild.memberCount]);
+                // Get last month's range
+                const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+                // Stats: New apps approved
+                const newAppsRes = await db.query(
+                    "SELECT COUNT(*) FROM applications WHERE status = 'approved' AND created_at >= $1 AND created_at < $2",
+                    [lastMonth, thisMonth]
+                );
+                const newAppsCount = newAppsRes.rows[0].count;
+
+                // Stats: Current active subs by tier
+                const subsRes = await db.query(
+                    "SELECT tier, COUNT(*) FROM subscriptions WHERE is_active = TRUE GROUP BY tier"
+                );
+                const tierStats = subsRes.rows.map(row => `${row.tier}: ${row.count}`).join('\n');
+
+                const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(id => id);
+
+                const reportEmbed = new EmbedBuilder()
+                    .setTitle('📊 月次レポート通知')
+                    .setDescription(`${lastMonth.getFullYear()}年${lastMonth.getMonth() + 1}月の運営統計です。`)
+                    .addFields(
+                        { name: '新規承認数', value: `${newAppsCount} 件`, inline: true },
+                        { name: '現在有効なサブスク', value: subsRes.rows.length > 0 ? tierStats : 'なし' }
+                    )
+                    .setColor(0x3498db)
+                    .setTimestamp();
+
+                const { sendWebhookNotification } = require('./applicationService');
+                await sendWebhookNotification({
+                    embeds: [reportEmbed.toJSON()]
+                });
+
+                for (const adminId of adminIds) {
+                    try {
+                        const adminUser = await client.users.fetch(adminId);
+                        await adminUser.send({ embeds: [reportEmbed] });
+                    } catch (e) {
+                        console.warn(`[Cron] Could not send report to admin ${adminId}`);
                     }
                 }
             } catch (err) {
-                console.error('[Cron] Error capturing snapshots:', err);
+                console.error('[Cron] Error generating monthly report:', err);
             }
         }
     });

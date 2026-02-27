@@ -26,7 +26,10 @@ const publicCommands = [
         .addStringOption(option =>
             option.setName('guild_id').setDescription('サーバーID (サーバー内で使用する場合は省略可)').setRequired(false))
         .addStringOption(option =>
-            option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false))
+            option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false)),
+    new SlashCommandBuilder()
+        .setName('portal')
+        .setDescription('購入者向けセルフポータルのリンクを表示します')
 ];
 
 const commands = [...adminCommands, ...publicCommands];
@@ -88,6 +91,13 @@ async function handleInteraction(interaction) {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
+            const boothOrderInput = new TextInputBuilder()
+                .setCustomId('booth_order_id')
+                .setLabel('BOOTH注文番号 (任意・入力で自動照合)')
+                .setPlaceholder('例: 12345678')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false);
+
             const userInput = new TextInputBuilder()
                 .setCustomId('user_id')
                 .setLabel('有効化するユーザーID')
@@ -107,6 +117,7 @@ async function handleInteraction(interaction) {
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(boothInput),
+                new ActionRowBuilder().addComponents(boothOrderInput),
                 new ActionRowBuilder().addComponents(userInput),
                 new ActionRowBuilder().addComponents(guildInput)
             );
@@ -138,7 +149,7 @@ async function handleInteraction(interaction) {
         }
     }
 
-    if (['sync', 'activate', 'setup_vc', 'setup_application', 'move'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'setup_vc', 'setup_application', 'move', 'portal'].includes(interaction.commandName)) {
         try {
             await logCommandUsage(interaction);
             const commandHandler = require(`./subcommands/${interaction.commandName}`);

@@ -51,11 +51,20 @@ router.get('/login', (req, res) => {
 
     const state = crypto.randomUUID();
     const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    const redirectTarget = req.query.redirect || 'dashboard';
 
     res.cookie('oauth_state', state, {
         httpOnly: true,
         secure: isSecure,
         maxAge: 1000 * 60 * 5, // 5 minutes
+        path: '/',
+        sameSite: 'Lax'
+    });
+
+    res.cookie('redirect_target', redirectTarget, {
+        httpOnly: true,
+        secure: isSecure,
+        maxAge: 1000 * 60 * 5,
         path: '/',
         sameSite: 'Lax'
     });
@@ -67,7 +76,7 @@ router.get('/login', (req, res) => {
         scope: 'identify guilds',
         state: state
     });
-    console.log('[OAuth] Login initiated. Redirect URI:', REDIRECT_URI);
+    console.log('[OAuth] Login initiated. Redirect URI:', REDIRECT_URI, 'Target:', redirectTarget);
     res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
 
@@ -123,20 +132,25 @@ router.get('/callback', async (req, res) => {
 
         const user = userResponse.data;
 
+        const redirectTarget = req.cookies['redirect_target'] || 'dashboard';
+        res.clearCookie('redirect_target');
+
         // --- Whitelist Check ---
         const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
-        const isEnvAllowed = allowedIds.length > 0 && allowedIds.includes(user.id);
+        const isExplicitAdmin = allowedIds.length > 0 && allowedIds.includes(user.id);
 
-        // Check database for staff entry if not in env whitelist
         let isDbAllowed = false;
-        if (!isEnvAllowed) {
+        if (!isExplicitAdmin) {
             const staffCheck = await db.query('SELECT 1 FROM staff_permissions WHERE user_id = $1', [user.id]);
             isDbAllowed = staffCheck.rows.length > 0;
         }
 
-        if (!isEnvAllowed && !isDbAllowed) {
-            console.warn(`[OAuth] Access denied for user ID: ${user.id} (${user.username}). Not in valid list.`);
-            return res.status(403).send('<h1>403 Forbidden</h1><p>You are not authorized to access this dashboard.</p><a href="/">Return to Home</a>');
+        const isStaff = isExplicitAdmin || isDbAllowed;
+
+        // If target is dashboard, check permissions. If portal, allow everyone (license check happens in portal.js)
+        if (redirectTarget === 'dashboard' && !isStaff) {
+            console.warn(`[OAuth] Access denied for user ID: ${user.id} (${user.username}). Not in staff list.`);
+            return res.status(403).send('<h1>403 Forbidden</h1><p>You are not authorized to access the staff dashboard.</p><a href="/">Return to Home</a>');
         }
         // -----------------------
 
@@ -170,8 +184,12 @@ router.get('/callback', async (req, res) => {
             sameSite: 'Lax'
         });
 
-        console.log(`[OAuth] Successful login for user ${user.id}. Session set in DB and cookies.`);
-        res.redirect('/');
+        console.log(`[OAuth] Successful login for user ${user.id}. Session set in DB and cookies. Target: ${redirectTarget}`);
+        if (redirectTarget === 'portal') {
+            res.redirect('/portal.html');
+        } else {
+            res.redirect('/');
+        }
 
     } catch (error) {
         const status = error.response?.status;
