@@ -51,6 +51,7 @@ module.exports = async (interaction) => {
 
     const row = new ActionRowBuilder().addComponents(select);
 
-    await interaction.reply({ content: '申請パネルを設置しました。', flags: MessageFlags.Ephemeral });
+    // Reply to the command confirm completion
+    await interaction.reply({ content: '✅ 申請パネルを設置しました。 `/apply` による操作は成功です。', flags: MessageFlags.Ephemeral });
     await interaction.channel.send({ embeds: [embed], components: [row] });
 };

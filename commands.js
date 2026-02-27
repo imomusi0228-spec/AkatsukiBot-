@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
-const { handleSupportVCButton, handleDeleteVCButton } = require('./handlers/buttonHandler');
 
 const adminCommands = [
     new SlashCommandBuilder()
@@ -7,16 +6,13 @@ const adminCommands = [
         .setDescription('サブスクリプションとロールを手動で同期します')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
-        .setName('setup_vc')
-        .setDescription('サポートVC作成パネルを設置します')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
-        .setName('setup_application')
+        .setName('apply')
         .setDescription('ライセンス申請パネルを設置します')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
         .setName('move')
         .setDescription('現在のサーバーのライセンスを解除し、別のサーバーへ移動する準備をします')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 
 const publicCommands = [
@@ -66,11 +62,6 @@ async function handleInteraction(interaction) {
     }
 
     if (interaction.isButton()) {
-        if (interaction.customId === 'create_support_vc') {
-            await handleSupportVCButton(interaction);
-        } else if (interaction.customId === 'delete_support_vc') {
-            await handleDeleteVCButton(interaction);
-        }
         return;
     }
 
@@ -149,7 +140,7 @@ async function handleInteraction(interaction) {
         }
     }
 
-    if (['sync', 'activate', 'setup_vc', 'setup_application', 'move', 'portal'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'apply', 'move', 'portal'].includes(interaction.commandName)) {
         try {
             await logCommandUsage(interaction);
             const commandHandler = require(`./subcommands/${interaction.commandName}`);
