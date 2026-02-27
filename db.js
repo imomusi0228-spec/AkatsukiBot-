@@ -264,6 +264,21 @@ async function initDB() {
       console.log(`[DB] Ojou Self-Correction: Upgraded ${ojouRes.rows.length} servers to ULTIMATE.`);
     }
 
+    // 6. Data Integrity: Set default expiry for paid tiers with NULL expiry_date
+    // ULTIMATE and Free tiers are excluded (they are intentionally unlimited or no expiry needed)
+    const fixedExpiryRes = await client.query(`
+      UPDATE subscriptions
+      SET expiry_date = NOW() + INTERVAL '1 month'
+      WHERE expiry_date IS NULL
+        AND tier NOT IN ('Free', '0', 'ULTIMATE')
+        AND is_active = TRUE
+      RETURNING guild_id, tier
+    `);
+    if (fixedExpiryRes.rows.length > 0) {
+      console.log(`[DB] Data Integrity Fix: Set default 1-month expiry for ${fixedExpiryRes.rows.length} paid subscription(s) that had NULL expiry_date.`);
+      fixedExpiryRes.rows.forEach(row => console.log(`  -> Guild: ${row.guild_id}, Tier: ${row.tier}`));
+    }
+
     console.log('[DB] Initialization and consolidation complete.');
   } catch (err) {
     console.error('[DB Error]', err);
