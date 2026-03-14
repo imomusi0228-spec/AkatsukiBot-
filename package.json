@@ -1,6 +1,6 @@
 {
   "name": "customer-management-bot",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Akatsuki Bot Customer Management System - Maintenance Update",
   "main": "index.js",
   "engines": {
