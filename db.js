@@ -212,7 +212,8 @@ async function initDB() {
       ],
       scheduled_announcements: [
         ['associated_tasks', "JSONB DEFAULT '[]'"],
-        ['is_draft', "BOOLEAN DEFAULT FALSE"]
+        ['is_draft', "BOOLEAN DEFAULT FALSE"],
+        ['target_tiers', "JSONB DEFAULT '[]'"]
       ],
       operation_logs: [
         ['target_name', 'VARCHAR(255)'],

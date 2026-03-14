@@ -661,8 +661,9 @@ createApp({
                     title: announceModal.title,
                     content: announceModal.content,
                     type: announceModal.type,
-                    scheduled_at: announceModal.scheduled_at,
-                    associated_tasks: announceModal.associated_tasks
+                    scheduled_at: announceModal.scheduled_at || null,
+                    associated_tasks: announceModal.associated_tasks,
+                    target_tiers: announceModal.target_tiers
                 });
                 if (res.success) {
                     alert('告知を送信/予約したで！');
@@ -893,6 +894,14 @@ createApp({
             }
 
             checkAuth();
+            
+            // Periodically update system status
+            setInterval(() => {
+                if (isAdminLogged.value || user.value) {
+                    loadSystemStatus();
+                }
+            }, 30000);
+
             window.addEventListener('keydown', handleKeydown);
         });
 
@@ -980,11 +989,12 @@ createApp({
             type: 'normal',
             scheduled_at: '',
             associated_tasks: [],
+            target_tiers: [],
             sending: false
         });
         const announcements = ref([]);
         const editAnnounceModal = reactive({
-            data: { id: null, title: '', content: '', type: 'normal', scheduled_at: '', associated_tasks: [] }
+            data: { id: null, title: '', content: '', type: 'normal', scheduled_at: '', associated_tasks: [], target_tiers: [] }
         });
 
         const loadAnnouncements = async () => {
@@ -1002,7 +1012,7 @@ createApp({
         };
 
         const openEditAnnounceModal = (ann) => {
-            editAnnounceModal.data = { ...ann, associated_tasks: ann.associated_tasks || [] };
+            editAnnounceModal.data = { ...ann, associated_tasks: ann.associated_tasks || [], target_tiers: ann.target_tiers || [] };
             if (ann.scheduled_at) {
                 const d = new Date(ann.scheduled_at);
                 const offset = d.getTimezoneOffset() * 60000;
@@ -1042,6 +1052,7 @@ createApp({
             toggleSelectAll, bulkDeactivate,
             announcements, deleteAnnouncement, openEditAnnounceModal, editAnnounceModal, saveAnnounceEdit, postNow,
             applyTemplate, fetchBotVersion, insertText,
+            systemStatus, isBackingUp,
             blacklist, removeFromBlacklist, openBlacklistModal, handleCsvDrop, handleCsvSelect, executeImport, importPreview, isImporting,
             roleMappings, fetchRoleMappings, saveRoleMapping, addRoleMapping, deleteRoleMapping,
             staffList, fetchStaff, updateStaffRole, addStaff, removeStaff,

@@ -24,6 +24,41 @@ async function executeAnnouncementTasks(client, tasks) {
     }
 }
 
+/**
+ * Send DMs to users who have specific tiers
+ */
+async function sendDMsByTiers(client, tiers, embed) {
+    if (!tiers || !Array.isArray(tiers) || tiers.length === 0) return;
+
+    try {
+        const query = tiers.includes('all')
+            ? 'SELECT DISTINCT user_id FROM subscriptions WHERE is_active = TRUE'
+            : 'SELECT DISTINCT user_id FROM subscriptions WHERE tier = ANY($1) AND is_active = TRUE';
+        const params = tiers.includes('all') ? [] : [tiers];
+
+        const res = await db.query(query, params);
+        const userIds = res.rows.map(r => r.user_id);
+
+        console.log(`[Announce] Starting DM delivery to ${userIds.length} users with tiers: ${tiers.join(', ')}`);
+
+        for (const userId of userIds) {
+            try {
+                const user = await client.users.fetch(userId);
+                if (user) {
+                    await user.send({ embeds: [embed] });
+                    // Small delay to avoid Discord rate limits (2 seconds)
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            } catch (err) {
+                console.error(`[Announce:DM] Failed to send to ${userId}:`, err.message);
+            }
+        }
+        console.log(`[Announce] Finished DM delivery to ${userIds.length} users.`);
+    } catch (err) {
+        console.error(`[Announce:DM] Fatal delivery error:`, err.message);
+    }
+}
+
 // POST /api/sync
 router.post('/sync', authMiddleware, async (req, res) => {
     const client = req.app.discordClient;
@@ -56,7 +91,7 @@ router.post('/announce', authMiddleware, async (req, res) => {
         return res.status(503).json({ error: 'Discord Client not ready' });
     }
 
-    const { title, content, type, scheduled_at, associated_tasks } = req.body;
+    const { title, content, type, scheduled_at, associated_tasks, target_tiers } = req.body;
     if (!title || !content) {
         return res.status(400).json({ error: 'Title and content are required' });
     }
@@ -68,8 +103,8 @@ router.post('/announce', authMiddleware, async (req, res) => {
 
         if (scheduled_at) {
             await db.query(
-                'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks, is_draft) VALUES ($1, $2, $3, $4, $5, $6)',
-                [processedTitle, processedContent, type || 'normal', scheduled_at, tasksJson, false]
+                'INSERT INTO scheduled_announcements (title, content, type, scheduled_at, associated_tasks, target_tiers, is_draft) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [processedTitle, processedContent, type || 'normal', scheduled_at, tasksJson, JSON.stringify(target_tiers || []), false]
             );
             return res.json({ success: true, message: 'Announcement scheduled' });
         }
@@ -99,14 +134,20 @@ router.post('/announce', authMiddleware, async (req, res) => {
             }
         };
 
+        // Send to channel first (standard)
         await channel.send({ embeds: [embed] });
+
+        // Targeted DMs if tiers provided
+        if (target_tiers && Array.isArray(target_tiers) && target_tiers.length > 0) {
+            sendDMsByTiers(client, target_tiers, embed); // Non-blocking
+        }
 
         // Execute associated tasks
         if (associated_tasks && associated_tasks.length > 0) {
             executeAnnouncementTasks(client, associated_tasks); // Fire and forget or await? Let's not block HTTP
         }
 
-        res.json({ success: true, message: 'Announcement posted' });
+        res.json({ success: true, message: 'Announcement posted' + (target_tiers?.length > 0 ? ' (DMs in progress)' : '') });
     } catch (err) {
         console.error('[Announce] Failed to post/schedule:', err);
         res.status(500).json({ error: err.message });
@@ -124,8 +165,8 @@ router.put('/announce/:id', authMiddleware, async (req, res) => {
         if (check.rows[0].sent_at) return res.status(400).json({ error: 'Already sent. Cannot edit.' });
 
         await db.query(
-            'UPDATE scheduled_announcements SET title = $1, content = $2, type = $3, scheduled_at = $4, associated_tasks = $5, is_draft = $6 WHERE id = $7',
-            [title, content, type, scheduled_at, JSON.stringify(associated_tasks || []), false, id]
+            'UPDATE scheduled_announcements SET title = $1, content = $2, type = $3, scheduled_at = $4, associated_tasks = $5, target_tiers = $6, is_draft = $7 WHERE id = $8',
+            [title, content, type, scheduled_at, JSON.stringify(associated_tasks || []), JSON.stringify(target_tiers || []), false, id]
         );
         res.json({ success: true, message: 'Announcement updated' });
     } catch (err) {
