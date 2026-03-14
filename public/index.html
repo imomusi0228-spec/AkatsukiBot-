@@ -233,6 +233,10 @@
                             @click="activeTab = 'blacklist'">ブラックリスト</button>
                     </li>
                     <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeTab === 'system' }"
+                            @click="activeTab = 'system'; loadSystemStatus()">システム</button>
+                    </li>
+                    <li class="nav-item">
                         <button class="nav-link" :class="{ active: activeTab === 'import' }"
                             @click="activeTab = 'import'">インポート</button>
                     </li>
@@ -834,7 +838,98 @@
                 </div>
             </div>
 
+            <!-- Tab Content: System (Health & Backup) -->
+            <div v-if="activeTab === 'system'" class="px-3 animate__animated animate__fadeIn">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="panel h-100 glass-panel">
+                            <h5 class="mb-4 text-accent d-flex justify-content-between">
+                                <span><i class="bi bi-cpu me-2"></i>システム・ヘルスモニター</span>
+                                <span class="badge" :class="systemStatus.bot.status === 'online' ? 'bg-success' : 'bg-danger'">
+                                    {{ systemStatus.bot.status.toUpperCase() }}
+                                </span>
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="p-3 rounded bg-dark-soft border border-soft text-center">
+                                        <div class="text-muted small mb-1">CPU Load</div>
+                                        <div class="h4 mb-0 text-info">{{ systemStatus.system.load }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 rounded bg-dark-soft border border-soft text-center">
+                                        <div class="text-muted small mb-1">Memory Usage</div>
+                                        <div class="h4 mb-0 text-warning">{{ systemStatus.system.memory.percent }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="p-3 rounded bg-dark-soft border border-soft">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">RAM ({{ systemStatus.system.memory.used }} / {{ systemStatus.system.memory.total }})</span>
+                                        </div>
+                                        <div class="progress" style="height: 6px; background: rgba(255,255,255,0.05);">
+                                            <div class="progress-bar bg-accent" :style="{ width: systemStatus.system.memory.percent }"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2">
+                                        <div class="text-muted extra-small">Bot Latency</div>
+                                        <div class="fw-bold">{{ systemStatus.bot.latency }}ms</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2">
+                                        <div class="text-muted extra-small">Bot Uptime</div>
+                                        <div class="fw-bold">{{ formatDuration(systemStatus.bot.uptime) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-top border-secondary opacity-50">
+                                <div class="extra-small text-muted">
+                                    OS: {{ systemStatus.system.platform }} {{ systemStatus.system.release }}<br>
+                                    CPU: {{ systemStatus.system.cpuModel }} ({{ systemStatus.system.cpuCount }} cores)
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-info w-100 mt-3" @click="loadSystemStatus">
+                                <i class="bi bi-arrow-clockwise me-1"></i> 更新
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="panel h-100 glass-panel">
+                            <h5 class="mb-4 text-warning"><i class="bi bi-shield-lock me-2"></i>バックアップ & セキュリティ</h5>
+                            <div class="mb-4">
+                                <label class="form-label small text-muted">データベース操作</label>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-warning" @click="triggerBackup" :disabled="isBackingUp">
+                                        <span v-if="isBackingUp" class="spinner-border spinner-border-sm me-2"></span>
+                                        <i v-else class="bi bi-download me-2"></i>今すぐバックアップを実行
+                                    </button>
+                                </div>
+                                <div class="form-text mt-2 extra-small text-muted">
+                                    実行すると、`backups/` ディレクトリにSQLまたはJSON形式でデータが保存されます。
+                                </div>
+                            </div>
+                            <div class="mb-0 pt-3 border-top border-secondary">
+                                <label class="form-label small text-muted">システムメンテナンス</label>
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center p-0">
+                                    <div>
+                                        <div class="fw-bold small">メンテナンスモード</div>
+                                        <div class="extra-small text-muted">新規のライセンス申請を一時的にブロックします。</div>
+                                    </div>
+                                    <input class="form-check-input ms-0" type="checkbox" v-model="settings.maintenance_mode"
+                                        @change="updateSetting('maintenance_mode', settings.maintenance_mode)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tab Content: Import -->
+
             <div v-if="activeTab === 'import'" class="px-3">
                 <div class="panel p-4" style="max-width: 800px; margin: 0 auto;">
                     <h4 class="mb-4"><i class="bi bi-file-earmark-arrow-up me-2"></i>BOOTHデータインポート</h4>
