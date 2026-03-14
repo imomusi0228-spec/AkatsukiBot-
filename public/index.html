@@ -75,7 +75,7 @@
         }
 
         .header-title {
-            background: linear-gradient(135deg, #fff 0%, #7aa2f7 100%);
+            background: linear-gradient(135deg, #fff 0%, #9ece6a 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: -0.5px;
@@ -146,20 +146,18 @@
                 <div class="d-flex align-items-center gap-4">
                     <h3 class="m-0 fw-bold header-title">AkatsukiBot Dashboard</h3>
                     
-                    <div class="d-flex align-items-center gap-3 system-monitor-mini border-start border-secondary ps-4">
+                    <div class="system-monitor-mini d-none d-md-flex gap-3 border-start border-secondary ps-4">
                         <div class="monitor-item">
-                            <i class="bi bi-cpu text-accent me-1"></i>
-                            <span class="text-muted extra-small">CPU</span>
-                            <span class="fw-bold ms-1" style="font-size: 0.9rem;">{{ systemStatus.system.load }}</span>
+                            <span class="text-secondary small me-1">CPU</span>
+                            <span class="fw-bold" style="color: #9ece6a">{{ systemStatus.system.load }}</span>
                         </div>
                         <div class="monitor-item">
-                            <i class="bi bi-memory text-warning me-1"></i>
-                            <span class="text-muted extra-small">RAM</span>
-                            <span class="fw-bold ms-1" style="font-size: 0.9rem;">{{ systemStatus.system.memory.percent }}</span>
+                            <span class="text-secondary small me-1">RAM</span>
+                            <span class="fw-bold" style="color: #9ece6a">{{ systemStatus.system.memory.percent }}</span>
                         </div>
-                        <div class="monitor-item d-flex align-items-center">
-                            <div class="status-dot-mini me-2" :class="systemStatus.bot.status === 'online' ? 'bg-success' : 'bg-danger'"></div>
-                            <span class="fw-bold" style="font-size: 0.9rem;">{{ systemStatus.bot.latency }}ms</span>
+                        <div class="monitor-item">
+                            <span class="status-dot-mini me-1" :style="{ backgroundColor: systemStatus.bot.latency < 200 ? '#9ece6a' : '#f7768e' }"></span>
+                            <span class="fw-bold" style="color: #9ece6a">{{ systemStatus.bot.latency }}ms</span>
                         </div>
                     </div>
                 </div>
