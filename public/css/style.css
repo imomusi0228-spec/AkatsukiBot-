@@ -1,4 +1,4 @@
-/* Premium Dark Theme */
+/* Premium Dark Theme (Simple) */
 :root {
     --bg-dark: #0f0f13;
     --bg-panel: #1a1b26;
@@ -20,12 +20,7 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
     color: #fff;
     font-weight: 600;
 }
@@ -35,12 +30,7 @@ h6 {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.panel:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
@@ -64,16 +54,11 @@ h6 {
     font-weight: 500;
     text-transform: uppercase;
     font-size: 0.85rem;
-    letter-spacing: 0.05em;
 }
 
 .table-dark td {
     border-bottom-color: var(--border);
     vertical-align: middle;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(122, 162, 247, 0.1);
 }
 
 .badge {
@@ -82,40 +67,43 @@ h6 {
     border-radius: 6px;
 }
 
-.text-accent {
-    color: var(--accent);
-}
-
-/* Tier Badges */
+/* Tier Badges (All 6 classes required by index.html) */
 .badge-tier-pro {
-    background-color: rgba(122, 162, 247, 0.2);
+    background-color: rgba(122, 162, 247, 0.25);
     color: #7aa2f7;
-    border: 1px solid rgba(122, 162, 247, 0.5);
+    border: 1px solid #7aa2f7;
 }
 
 .badge-tier-pro-plus {
-    background-color: rgba(224, 175, 104, 0.2);
+    background-color: rgba(224, 175, 104, 0.25);
     color: #e0af68;
-    border: 1px solid rgba(224, 175, 104, 0.5);
-    box-shadow: 0 0 10px rgba(224, 175, 104, 0.2);
+    border: 1px solid #e0af68;
 }
 
-.badge-tier-trial-pro {
-    background-color: rgba(122, 162, 247, 0.1);
-    color: #7aa2f7;
-    border: 1px dashed rgba(122, 162, 247, 0.8);
-}
-
-.badge-tier-trial-pro-plus {
-    background-color: rgba(224, 175, 104, 0.1);
-    color: #e0af68;
-    border: 1px dashed rgba(224, 175, 104, 0.8);
+.badge-tier-ultimate {
+    background-color: rgba(187, 154, 247, 0.25);
+    color: #bb9af7;
+    border: 1px solid #bb9af7;
+    font-weight: 700;
 }
 
 .badge-tier-free {
     background-color: rgba(86, 95, 137, 0.2);
     color: #565f89;
-    border: 1px solid rgba(86, 95, 137, 0.5);
+    border: 1px solid var(--border);
+}
+
+/* Trial系（点線の枠） */
+.badge-tier-trial-pro {
+    background-color: rgba(122, 162, 247, 0.12);
+    color: #7aa2f7;
+    border: 1px dashed #7aa2f7;
+}
+
+.badge-tier-trial-pro-plus {
+    background-color: rgba(224, 175, 104, 0.12);
+    color: #e0af68;
+    border: 1px dashed #e0af68;
 }
 
 /* Stats Cards */
@@ -129,7 +117,6 @@ h6 {
 .stat-value {
     font-size: 2.5rem;
     font-weight: 700;
-    line-height: 1;
     margin-bottom: 0.5rem;
 }
 
@@ -137,56 +124,21 @@ h6 {
     color: var(--text-muted);
     font-size: 0.9rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-/* Animations */
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
 }
 
 /* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--bg-dark);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--text-muted);
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 /* Inputs */
-.form-control,
-.form-select {
+.form-control, .form-select {
     background-color: #16161e;
     border-color: var(--border);
     color: var(--text-main);
 }
 
-.badge-tier-ultimate {
-    background-color: rgba(187, 154, 247, 0.2) !important;
-    color: var(--accent) !important;
-    border: 1px solid rgba(187, 154, 247, 0.5) !important;
-    box-shadow: 0 0 10px rgba(187, 154, 247, 0.2);
-}
-
-.form-control:focus,
-.form-select:focus {
+.form-control:focus, .form-select:focus {
     background-color: #16161e;
     border-color: var(--primary);
     color: #fff;
@@ -199,11 +151,4 @@ h6 {
     border: 1px solid var(--border);
 }
 
-.modal-header,
-.modal-footer {
-    border-color: var(--border);
-}
-
-[v-cloak] {
-    display: none;
-}
+[v-cloak] { display: none; }

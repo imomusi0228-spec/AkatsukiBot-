@@ -5,10 +5,6 @@ const adminCommands = [
         .setName('sync')
         .setDescription('サブスクリプションとロールを最新の状態に同期します'),
     new SlashCommandBuilder()
-        .setName('apply')
-        .setDescription('ライセンス申請パネルを設置します')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
         .setName('move')
         .setDescription('現在のサーバーのライセンスを解除し、別のサーバーへ移動する準備をします')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -17,17 +13,30 @@ const adminCommands = [
 const publicCommands = [
     new SlashCommandBuilder()
         .setName('activate')
-        .setDescription('サーバーのサブスクリプションを有効化します')
+        .setDescription('サーバーのライセンスを有効化します (既存プランの枠利用はキー不要)')
         .addStringOption(option =>
-            option.setName('guild_id').setDescription('サーバーID (サーバー内で使用する場合は省略可)').setRequired(false))
+            option.setName('guild_id').setDescription('有効化するサーバーID (省略時は現在地)').setRequired(false))
         .addStringOption(option =>
-            option.setName('key').setDescription('ライセンスキーまたはBooth注文番号').setRequired(false)),
+            option.setName('key').setDescription('ライセンスキーまたは注文番号 (既存登録枠利用時は不要)').setRequired(false)),
     new SlashCommandBuilder()
         .setName('portal')
         .setDescription('購入者向けセルフポータルのリンクを表示します'),
     new SlashCommandBuilder()
         .setName('sync')
-        .setDescription('あなたのステータスを同期します（管理者の場合は全体同期）')
+        .setDescription('あなたのステータスを同期します（管理者の場合は全体同期）'),
+    new SlashCommandBuilder()
+        .setName('license')
+        .setDescription('このサーバーからボットのライセンス利用申請を行います')
+        .addStringOption(option => 
+            option.setName('tier')
+                .setDescription('申請するプラン (Tier) を選択してください')
+                .setRequired(true)
+                .addChoices(
+                    {name: 'Trial Pro (無料お試し)', value: 'Trial Pro'},
+                    {name: 'Trial Pro+ (無料お試し)', value: 'Trial Pro+'},
+                    {name: 'Pro', value: 'Pro'},
+                    {name: 'Pro+', value: 'Pro+'}
+                ))
 ];
 
 const commands = [...adminCommands, ...publicCommands];
@@ -127,11 +136,60 @@ async function handleInteraction(interaction) {
         }
         return;
     }
-
     if (!interaction.isChatInputCommand()) return;
 
+    if (interaction.commandName === 'license') {
+        const selectedTier = interaction.options.getString('tier');
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+
+        const modal = new ModalBuilder()
+            .setCustomId(`application_modal:${selectedTier}`)
+            .setTitle(`ライセンス申請 (${selectedTier})`);
+
+        const boothInput = new TextInputBuilder()
+            .setCustomId('booth_name')
+            .setLabel('購入者名 (BOOTH)')
+            .setPlaceholder('例: 山田 太郎')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const boothOrderInput = new TextInputBuilder()
+            .setCustomId('booth_order_id')
+            .setLabel('BOOTH注文番号 (任意・入力で自動照合)')
+            .setPlaceholder('例: 12345678')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false);
+
+        const userInput = new TextInputBuilder()
+            .setCustomId('user_id')
+            .setLabel('有効化するユーザーID')
+            .setValue(interaction.user.id)
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const isSupportGuild = interaction.guildId === process.env.SUPPORT_GUILD_ID;
+
+        const guildInput = new TextInputBuilder()
+            .setCustomId('guild_id')
+            .setLabel('有効化するサーバーID')
+            .setPlaceholder('例: 123456789012345678')
+            .setValue(!isSupportGuild && interaction.guildId ? interaction.guildId : '')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(boothInput),
+            new ActionRowBuilder().addComponents(boothOrderInput),
+            new ActionRowBuilder().addComponents(userInput),
+            new ActionRowBuilder().addComponents(guildInput)
+        );
+
+        await interaction.showModal(modal);
+        return;
+    }
+
     // Admin commands authorization check
-    const adminActionCommands = ['apply', 'move', 'setup_vc']; // list explicitly
+    const adminActionCommands = ['move']; // list explicitly
     const isAdminCommand = adminActionCommands.includes(interaction.commandName);
     if (isAdminCommand) {
         const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
@@ -143,7 +201,7 @@ async function handleInteraction(interaction) {
         }
     }
 
-    if (['sync', 'activate', 'apply', 'move', 'portal'].includes(interaction.commandName)) {
+    if (['sync', 'activate', 'move', 'portal'].includes(interaction.commandName)) {
         try {
             await logCommandUsage(interaction);
             const commandHandler = require(`./subcommands/${interaction.commandName}`);

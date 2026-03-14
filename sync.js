@@ -25,12 +25,11 @@ async function getDynamicRoles() {
     }
 }
 
-/**
- * Updates member roles based on the given tier.
- * @param {import('discord.js').Guild} guild 
- * @param {string} userId 
- * @param {string} tier 
- */
+const TIER_GROUPS = {
+    PRO: ['Pro', '1', '2', 'Trial Pro'],
+    PRO_PLUS: ['Pro+', '3', '4', 'Trial Pro+', 'ULTIMATE']
+};
+
 async function updateMemberRoles(guild, userId, tier) {
     try {
         const member = await guild.members.fetch(userId).catch(() => null);
@@ -44,24 +43,17 @@ async function updateMemberRoles(guild, userId, tier) {
             ROLES['ProMonthly'], ROLES['ProYearly'],
             ROLES['ProPlusMonthly'], ROLES['ProPlusYearly'],
             ROLES['Pro'], ROLES['Pro+']
-        ].filter(id => id); // Remove empty/null strings
+        ].filter(id => id);
 
         let rolesToAdd = [];
-        if (tier === 'ULTIMATE' || tier === 'Pro+' || tier === 'Trial Pro+') {
-            // Favor Yearly/Specific from DB if both might exist
+        if (TIER_GROUPS.PRO_PLUS.includes(tier)) {
             rolesToAdd = [ROLES['Pro+'], ROLES['ProPlusMonthly'], ROLES['ProPlusYearly']].filter(id => id);
-        } else if (tier === 'Pro' || tier === 'Trial Pro') {
+        } else if (TIER_GROUPS.PRO.includes(tier)) {
             rolesToAdd = [ROLES['Pro'], ROLES['ProMonthly'], ROLES['ProYearly']].filter(id => id);
         }
 
-        // To be safe, we only add the roles the user *actually* should have based on current roles if we wanted to be precise,
-        // but typically we just add what corresponds to the tier.
-        // Actually, if we are sync-ing TIERS, we should probably know WHICH exact role they have.
-        // But for updateMemberRoles(web), let's just make sure they have at least one of the tier roles.
-
         await member.roles.remove(rolesToRemove);
         if (rolesToAdd.length > 0) {
-            // Add the first valid role for that tier
             await member.roles.add(rolesToAdd[0]);
         }
 
@@ -73,11 +65,6 @@ async function updateMemberRoles(guild, userId, tier) {
     }
 }
 
-/**
- * Syncs subscriptions based on roles in the support server.
- * @param {Client} client 
- * @param {string} [targetUserId] - Optional user ID to sync only one member
- */
 async function syncSubscriptions(client, targetUserId = null) {
     if (targetUserId) {
         console.log(`Starting individual subscription sync for user ${targetUserId}...`);
@@ -92,22 +79,16 @@ async function syncSubscriptions(client, targetUserId = null) {
         return { success: false, message: 'Support guild not found.' };
     }
 
-    // Fetch members with relevant roles only to stay lightweight
     let members;
     try {
         const roleIds = Object.values(ROLES).filter(id => id);
         if (targetUserId) {
-            // Individual sync: only fetch and check the target user
             const member = await guild.members.fetch({ user: targetUserId, force: true }).catch(() => null);
             members = new Map();
             if (member && roleIds.some(rId => member.roles.cache.has(rId))) {
                 members.set(member.id, member);
             }
         } else {
-            // Global sync: fetch only users who have at least one subscription role
-            // guild.members.fetch() with no options fetches all. Instead, we use query if possible or filter results.
-            // Discord API doesn't allow multi-role filter in fetch easily, so we fetch all but use a lighter method if possible.
-            // However, to be safe and thorough, we'll keep the filter but ensure we don't 'force: true' unless necessary.
             members = await guild.members.fetch({ withPresences: false });
             members = members.filter(m => roleIds.some(rId => m.roles.cache.has(rId)));
         }
@@ -136,10 +117,10 @@ async function syncSubscriptions(client, targetUserId = null) {
                     const userName = member.user.globalName || member.user.username;
                     for (const row of res.rows) {
                         const currentTier = String(row.tier || '');
-                        // Don't downgrade Trial or ULTIMATE
-                        const isMatch = (currentTier === tier) || (currentTier === `Trial ${tier}`) || (currentTier === 'ULTIMATE') ||
-                            (tier === 'Pro' && (currentTier === '1' || currentTier === '2')) ||
-                            (tier === 'Pro+' && (currentTier === '3' || currentTier === '4'));
+                        
+                        const isProPlusMatch = TIER_GROUPS.PRO_PLUS.includes(tier) && TIER_GROUPS.PRO_PLUS.includes(currentTier);
+                        const isProMatch = TIER_GROUPS.PRO.includes(tier) && TIER_GROUPS.PRO.includes(currentTier);
+                        const isMatch = isProPlusMatch || isProMatch;
 
                         const needsNameUpdate = row.cached_username !== userName;
 
@@ -169,10 +150,6 @@ async function syncSubscriptions(client, targetUserId = null) {
                 console.error(`[Sync] Error syncing user ${memberId}:`, err);
                 errors.push(`Error syncing ${member.user.tag}`);
             }
-        } else {
-            // [Safety] We NO LONGER automatically deactivate subscriptions if role is not found.
-            // This prevents accidental deactivation due to cache issues or bot permission problems.
-            // If you want to handle "Unsub" logic, it should be done based on Expiry Date or explicit cancel.
         }
     }
 

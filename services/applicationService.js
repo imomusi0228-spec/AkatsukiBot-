@@ -127,6 +127,51 @@ async function saveApplication(appData, client = null) {
             return { success: true, id: resultId, auto_processed: true, auto_rejected: false };
         }
 
+        // --- NEW LOGIC: Existing Quota Auto-Approval ---
+        try {
+            const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE ORDER BY created_at ASC', [userId]);
+            const existingSubs = existingResult.rows;
+
+            if (existingSubs.length > 0) {
+                // Determine limits and highest tier
+                const isProPlus = (t) => {
+                    const s = String(t || '').toLowerCase();
+                    return s === 'pro+' || s === '3' || s === '4' || s === 'trial pro+';
+                };
+                const isUltimate = (t) => String(t || '').toUpperCase() === 'ULTIMATE';
+
+                const hasUltimate = existingSubs.some(s => isUltimate(s.tier));
+                const hasProPlus = existingSubs.some(s => isProPlus(s.tier));
+
+                let maxLimit = 1;
+                let highestTierStr = 'Pro';
+                if (hasUltimate) {
+                    maxLimit = 999;
+                    highestTierStr = 'ULTIMATE';
+                } else if (hasProPlus) {
+                    maxLimit = 3;
+                    highestTierStr = 'Pro+';
+                }
+
+                if (existingSubs.length < maxLimit) {
+                    console.log(`[AppService] Existing quota found for User: ${userId}. Auto-approving ${highestTierStr} tier.`);
+                    
+                    // Update application tier to the highest they own
+                    await db.query("UPDATE applications SET parsed_tier = $1 WHERE id = $2", [highestTierStr, resultId]);
+                    
+                    // Automatically approve using system account
+                    await approveApplication(resultId, 'SYSTEM_AUTO', 'System (Quota Auto-Approval)', true, client);
+                    
+                    return { success: true, id: resultId, auto_processed: true, auto_rejected: false };
+                } else {
+                    console.log(`[AppService] User ${userId} has hit max limit (${maxLimit}) for their active subscriptions. Falling back to normal flow.`);
+                }
+            }
+        } catch (quotaErr) {
+            console.error('[AppService] Error checking existing quota:', quotaErr);
+        }
+        // --- END NEW LOGIC ---
+
         const isTrial = TRIAL_TIERS.includes(tier);
 
         if (isTrial) {

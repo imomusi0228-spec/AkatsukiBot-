@@ -1,0 +1,436 @@
+<div class="card" style="max-width: 1100px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="margin:0;">
+            <%= t("ticket_mgmt_title") %>
+        </h3>
+        <div style="display:flex; gap:10px;">
+            <select id="statusFilter" style="font-size:12px;">
+                <option value="all">
+                    <%= t("status_all") %>
+                </option>
+                <option value="open" selected>
+                    <%= t("status_open") %>
+                </option>
+                <option value="closed">
+                    <%= t("status_closed") %>
+                </option>
+            </select>
+            <button id="refreshTickets" class="btn btn-primary" style="padding:4px 12px; font-size:12px;">
+                <%= t("refresh_btn") %>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- 2. Ticket Settings (Consolidated from main settings) -->
+    <div class="setting-section"
+        style="margin-bottom:24px; background:rgba(255,255,255,0.02); padding:20px; border-radius:8px; border:1px solid var(--border-color);">
+        <h4
+            style="margin-top:0; margin-bottom:15px; font-size:14px; color:var(--text-primary); border-left: 4px solid var(--accent-color); padding-left: 10px;">
+            <%= t("ticket_basic_settings") %>
+        </h4>
+        <div style="margin-bottom:20px;">
+            <label class="muted" style="font-size:12px;">
+                <%= t("mod_role_label") %>
+            </label><br />
+            <select id="ticketStaffRole" style="width:100%; margin-top:8px; padding:10px; border-radius:8px;">
+                <option value="">
+                    <%= t("loading_dots") %>
+                </option>
+            </select>
+            <p class="muted" style="font-size:11px; margin-top:8px;">
+                <%= t("mod_role_help") %>
+            </p>
+        </div>
+        <div style="margin-bottom:20px;">
+            <label class="muted" style="font-size:12px;">
+                <%= t("ticket_log_ch_label") %>
+            </label><br />
+            <select id="ticketLogCh" style="width:100%; margin-top:8px; padding:10px; border-radius:8px;">
+                <option value="">
+                    <%= t("loading_dots") %>
+                </option>
+            </select>
+            <p class="muted" style="font-size:11px; margin-top:8px;">
+                <%= t("ticket_log_ch_help") %>
+            </p>
+        </div>
+        <div style="margin-bottom:20px;">
+            <label class="muted" style="font-size:12px;">
+                <%= t("ticket_welcome_msg_label") %>
+            </label><br />
+            <textarea id="ticketWelcomeMsg"
+                style="width:100%; height:80px; margin-top:8px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.2); color:white; font-size:13px;"
+                placeholder="<%= t(" ticket_welcome_msg_placeholder") %>"></textarea>
+            <p class="muted" style="font-size:11px; margin-top:8px;">
+                <%= t("ticket_welcome_msg_help") %>
+            </p>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; align-items:center;">
+            <span id="saveStatus" style="font-size:12px;"></span>
+            <button id="saveTicketSettings" class="btn btn-primary" style="padding:6px 20px; font-size:13px;">
+                <%= t("save_settings") %>
+            </button>
+        </div>
+    </div>
+
+    <!-- B-10: チケットカテゴリ管理 -->
+    <div class="setting-section"
+        style="margin-bottom:24px; background:rgba(255,255,255,0.02); padding:20px; border-radius:8px; border:1px solid var(--border-color);">
+        <h4
+            style="margin-top:0; margin-bottom:15px; font-size:14px; color:var(--text-primary); border-left: 4px solid #FFAD1F; padding-left: 10px;">
+            <%= t("ticket_cat_settings") %>
+        </h4>
+        <p class="muted" style="font-size:12px; margin-bottom:15px;">
+            <%= t("ticket_cat_desc") %>
+        </p>
+        <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap: wrap;">
+            <input id="newCategoryEmoji" type="text" placeholder="🎫" style="width:60px; text-align:center;">
+            <input id="newCategoryName" type="text" placeholder="<%= t("cat_name_placeholder") %>" style="flex:1;
+            min-width:180px;">
+            <input id="newCategoryDesc" type="text" placeholder="<%= t("cat_desc_placeholder") %>" style="flex:2;
+            min-width:200px;">
+            <button onclick="addTicketCategory()" class="btn btn-primary"
+                style="padding:6px 16px; white-space:nowrap;">＋ <%= t("add_btn") %></button>
+        </div>
+        <div id="categoryList" style="display:flex; flex-direction:column; gap:8px;">
+            <div class="muted" style="text-align:center; padding:15px;">
+                <%= t("loading_dots") %>
+            </div>
+        </div>
+    </div>
+    <!-- /B-10 -->
+
+    <div style="overflow-x: auto;">
+        <table style="width:100%; min-width:800px;">
+            <thead>
+                <tr>
+                    <th style="width:80px;">
+                        <%= t("ticket_id") %>
+                    </th>
+                    <th>
+                        <%= t("ticket_creator") %>
+                    </th>
+                    <th>
+                        <%= t("ticket_staff") %>
+                    </th>
+                    <th style="width:120px;">
+                        <%= t("ticket_status") %>
+                    </th>
+                    <th style="width:180px;">
+                        <%= t("ticket_created") %>
+                    </th>
+                    <th style="width:160px; text-align:right;">
+                        <%= t("ticket_action") %>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="ticketList">
+                <tr>
+                    <td colspan="6" class="muted" style="text-align:center; padding:30px;">
+                        <%= t("loading") %>...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Assign Member Modal -->
+<div id="assignModal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; padding:20px;">
+    <div class="card"
+        style="width:100%; max-width:400px; padding:20px; border:1px solid var(--accent-color); position:relative;">
+        <h4 style="margin-top:0; color:var(--accent-color);">
+            <%= t("assign_staff_title") %>
+        </h4>
+        <p class="muted" style="font-size:12px; margin-bottom:15px;">
+            <%= t("assign_staff_desc") %>
+        </p>
+        <div id="memberList"
+            style="max-height:300px; overflow-y:auto; margin-bottom:20px; display:flex; flex-direction:column; gap:8px;">
+            <!-- Members will be loaded here -->
+        </div>
+        <div style="display:flex; justify-content:flex-end;">
+            <button onclick="$('assignModal').style.display='none'" class="btn"
+                style="padding:4px 12px; font-size:12px;">
+                <%= t("cancel_btn") %>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .status-open {
+        background: rgba(0, 186, 124, 0.1);
+        color: #00ba7c;
+        border: 1px solid rgba(0, 186, 124, 0.2);
+    }
+
+    .status-closed {
+        background: rgba(139, 155, 180, 0.1);
+        color: #8b9bb4;
+        border: 1px solid rgba(139, 155, 180, 0.2);
+    }
+
+    .staff-assign-btn {
+        background: rgba(var(--accent-rgb), 0.1);
+        color: var(--accent-color);
+        border: 1px solid var(--accent-color);
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-right: 5px;
+    }
+
+    .staff-assign-btn:hover {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .member-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+
+    .member-item:hover {
+        background: rgba(var(--accent-rgb), 0.1);
+        border-color: var(--accent-color);
+    }
+
+    .member-item img {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+    }
+
+    .btn-delete {
+        padding: 2px 8px;
+        font-size: 11px;
+        background: rgba(244, 33, 46, 0.1);
+        color: #f4212e;
+        border: 1px solid rgba(244, 33, 46, 0.3);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-delete:hover {
+        background: #f4212e;
+        color: white;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        initTicketsPage();
+    });
+
+    async function initTicketsPage() {
+        loadTickets();
+        loadCategories();
+        loadTicketSettings(); // <<< 設定値をUIに反映
+
+        document.getElementById("refreshTickets")
+            .addEventListener("click", loadTickets);
+
+        document.getElementById("statusFilter")
+            .addEventListener("change", loadTickets);
+
+        // B-10: チケット設定保存ボタン
+        const saveBtn = document.getElementById("saveTicketSettings");
+        if (saveBtn) {
+            saveBtn.onclick = async () => {
+                const gid = getGuildId();
+                if (!gid) return;
+                const body = {
+                    guild: gid,
+                    ticket_staff_role_id: document.getElementById("ticketStaffRole")?.value || "",
+                    ticket_log_channel_id: document.getElementById("ticketLogCh")?.value || "",
+                    ticket_welcome_msg: document.getElementById("ticketWelcomeMsg")?.value || ""
+                };
+                const r = await api("/api/settings/update", body);
+                const st = document.getElementById("saveStatus");
+                if (st) st.textContent = r.ok ? "✅ " + t("save_success") : "❌ " + r.error;
+                setTimeout(() => { if (st) st.textContent = ""; }, 3000);
+            };
+        }
+    }
+
+    // 設定値をUIにロードする関数
+    async function loadTicketSettings() {
+        const gid = getGuildId();
+        if (!gid) return;
+
+        // ロールとチャンネル一覧を並行して取得
+        const [settingsRes, rolesRes, channelsRes] = await Promise.all([
+            api(`/api/settings?guild=${gid}`),
+            api(`/api/roles?guild=${gid}`),
+            api(`/api/channels?guild=${gid}`)
+        ]);
+
+        const s = settingsRes.ok ? settingsRes.settings : {};
+
+        // ロール選択肢をセット
+        const staffRoleEl = document.getElementById("ticketStaffRole");
+        if (staffRoleEl && rolesRes.ok) {
+            staffRoleEl.innerHTML = `<option value="">${t("none_option") || "-- なし --"}</option>` +
+                rolesRes.roles.map(r => `<option value="${r.id}" ${s.ticket_staff_role_id === r.id ? "selected" : ""}>${r.name}</option>`).join("");
+        }
+
+        // チャンネル選択肢をセット
+        const logChEl = document.getElementById("ticketLogCh");
+        if (logChEl && channelsRes.ok) {
+            const textChannels = channelsRes.channels.filter(c => c.type === 0);
+            logChEl.innerHTML = `<option value="">${t("none_option") || "-- なし --"}</option>` +
+                textChannels.map(c => `<option value="${c.id}" ${s.ticket_log_channel_id === c.id ? "selected" : ""}>#${c.name}</option>`).join("");
+        }
+
+        // メッセージをセット
+        const msgEl = document.getElementById("ticketWelcomeMsg");
+        if (msgEl && s.ticket_welcome_msg) {
+            msgEl.value = s.ticket_welcome_msg;
+        }
+    }
+
+    // B-10: カテゴリ一覧読み込み
+    async function loadCategories() {
+        const gid = getGuildId();
+        const list = document.getElementById("categoryList");
+        if (!gid || !list) return;
+        const r = await api(`/api/ticket-categories?guild=${gid}`);
+        if (!r.ok) { list.innerHTML = `<div class="muted" style="text-align:center; padding:15px;">${t("loading_failed")}</div>`; return; }
+        if (r.categories.length === 0) {
+            list.innerHTML = `<div class="muted" style="text-align:center; padding:15px;">${t("no_categories")}</div>`;
+        } else {
+            list.innerHTML = r.categories.map(c => `
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border-color);">
+                    <span style="font-size:22px;">${escapeHTML(c.emoji || '🎫')}</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:600; font-size:13px;">${escapeHTML(c.name)}</div>
+                        <div class="muted" style="font-size:11px;">${escapeHTML(c.description || '')}</div>
+                    </div>
+                    <button onclick="deleteCategory(${c.id})" class="btn" style="padding:3px 10px; font-size:11px; background:rgba(244,33,46,0.1); color:#f4212e; border-color:rgba(244,33,46,0.3);">${t("delete_btn")}</button>
+                </div>
+            `).join('');
+        }
+    }
+
+    // B-10: カテゴリ追加
+    async function addTicketCategory() {
+        const gid = getGuildId();
+        const name = document.getElementById("newCategoryName")?.value?.trim();
+        if (!gid || !name) return alert(t("category_name_required"));
+        const r = await api("/api/ticket-categories", {
+            guild: gid,
+            name,
+            emoji: document.getElementById("newCategoryEmoji")?.value?.trim() || "🎫",
+            description: document.getElementById("newCategoryDesc")?.value?.trim() || ""
+        }, "POST");
+        if (r.ok) {
+            document.getElementById("newCategoryName").value = "";
+            document.getElementById("newCategoryDesc").value = "";
+            loadCategories();
+        } else alert("Error: " + r.error);
+    }
+
+    // B-10: カテゴリ削除
+    async function deleteCategory(id) {
+        const gid = getGuildId();
+        if (!confirm(t("confirm_delete_category"))) return;
+        const r = await api("/api/ticket-categories", { guild: gid, id }, "DELETE");
+        if (r.ok) loadCategories(); else alert("Error: " + r.error);
+    }
+
+    function getGuildId() {
+        return document.getElementById("globalGuildSelect")?.value || null;
+    }
+
+    async function loadTickets() {
+        const tbody = document.getElementById("ticketList");
+        const status = document.getElementById("statusFilter").value;
+
+        tbody.innerHTML = `
+        <tr>
+            <td colspan="6" style="text-align:center; padding:20px;">
+                ${t("loading_dots")}
+            </td>
+        </tr>
+    `;
+
+        try {
+            const gid = getGuildId();
+            const res = await api(`/api/tickets?guild=${gid}`);
+            const tickets = res.ok ? res.tickets : [];
+
+            const filtered = status === "all"
+                ? tickets
+                : tickets.filter(t => t.status === status);
+
+            if (!filtered.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align:center; padding:20px;">
+                        ${t("no_tickets")}
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = "";
+
+            filtered.forEach(t => {
+                const tr = document.createElement("tr");
+
+                const logBtn = t.transcript_id
+                    ? `<a href="/transcripts/${t.transcript_id}.html" target="_blank" class="staff-assign-btn">${t("ticket_log_btn")}</a>`
+                    : "";
+
+                tr.innerHTML = `
+                <td>${t.id}</td>
+                <td>${t.user_id}</td>
+                <td>${t.assigned_to || t("unassigned")}</td>
+                <td>
+                    <span class="status-badge status-${t.status}">
+                        ${t.status}
+                    </span>
+                </td>
+                <td>${new Date(t.created_at).toLocaleString(window.lang === 'ja' ? 'ja-JP' : 'en-US')}</td>
+                <td style="text-align:right;">
+                    ${logBtn}
+                </td>
+            `;
+
+                tbody.appendChild(tr);
+            });
+
+        } catch (err) {
+            tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align:center; padding:20px;">
+                    ${t("loading_failed")}
+                </td>
+            </tr>
+        `;
+            console.error(err);
+        }
+    }
+</script>

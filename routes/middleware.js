@@ -33,11 +33,50 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 // This works because attacker cannot read the cookie from a different origin to set the header.
 
 async function authMiddleware(req, res, next) {
-    const token = req.headers['authorization'];
+    let token = req.headers['authorization'];
+    if (!token && req.query.token) {
+        token = req.query.token; // fallback for window.open() downloads
+    }
     const sessionId = req.cookies['session_id'];
 
-    // LOG: Trace Auth Attempt
-    // console.log(`[AuthMW] Request: ${req.method} ${req.path}, SessionID Present: ${!!sessionId}`);
+    // 0. Maintenance Mode Check
+    try {
+        const maintRes = await db.query("SELECT value FROM bot_system_settings WHERE key = 'maintenance_mode'");
+        const isMaint = maintRes.rows.length > 0 ? maintRes.rows[0].value === 'true' : false;
+        
+        if (isMaint) {
+            // Check if it's admin/staff BEFORE blocking
+            // Admin token is always allowed
+            if (token && (token === `Bearer ${ADMIN_TOKEN}` || token === ADMIN_TOKEN)) {
+                req.user = { userId: 'admin-token', username: 'System Admin', role: 'admin' };
+                return next();
+            }
+
+            // For session-based, check if they are in ADMIN_DISCORD_IDS
+            if (sessionId) {
+                const sessionRes = await db.query('SELECT user_id FROM user_sessions WHERE session_id = $1', [sessionId]);
+                if (sessionRes.rows.length > 0) {
+                    const userId = sessionRes.rows[0].user_id;
+                    const allowedIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim());
+                    if (!allowedIds.includes(userId)) {
+                        return res.status(503).json({ 
+                            error: 'Service Unavailable', 
+                            message: '現在メンテナンス中です。しばらく経ってから再度お試しください。' 
+                        });
+                    }
+                }
+                // If no matching session, proceed to regular auth (which will fail with 401/503)
+            } else {
+                // No token, no session -> direct block
+                return res.status(503).json({ 
+                    error: 'Service Unavailable', 
+                    message: '現在メンテナンス中です。しばらく経ってから再度お試しください。' 
+                });
+            }
+        }
+    } catch (err) {
+        console.error('[MaintCheck] Error:', err);
+    }
 
     // API Token Access
     if (token && (token === `Bearer ${ADMIN_TOKEN}` || token === ADMIN_TOKEN)) {

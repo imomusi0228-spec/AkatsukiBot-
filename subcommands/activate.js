@@ -9,6 +9,13 @@ const ROLES = {
     'ProPlusYearly': process.env.ROLE_PRO_PLUS_YEARLY
 };
 
+const isProPlus = (t) => {
+    if (!t) return false;
+    const s = String(t).toLowerCase();
+    return s === 'pro+' || s === '3' || s === '4' || s === 'trial pro+' || s === 'ultimate';
+};
+const isUltimate = (t) => String(t || '').toUpperCase() === 'ULTIMATE';
+
 module.exports = async (interaction) => {
     // 1. Defer the reply immediately to prevent "Unknown interaction" timeout errors (3s limit)
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -22,10 +29,6 @@ module.exports = async (interaction) => {
         return interaction.editReply({ content: '❌ サーバーIDを指定するか、サーバー内でコマンドを実行してください。' });
     }
 
-    if (!inputKey) {
-        return interaction.editReply({ content: '❌ **ライセンスキーを入力してください。**\nBOOTHで送られたキーが必要です。' });
-    }
-
     if (!/^\d{17,20}$/.test(guildId)) {
         return interaction.editReply({ content: '❌ **無効なサーバーIDです。**\n正しいIDを入力してください。' });
     }
@@ -34,6 +37,30 @@ module.exports = async (interaction) => {
     let durationMonths = 0;
     let durationDays = 0;
     let usedKey = null;
+
+    // Fetch existing subscriptions for this user first
+    const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE ORDER BY created_at ASC', [userId]);
+    const existingSubs = existingResult.rows;
+
+    if (!inputKey) {
+        if (existingSubs.length === 0) {
+            return interaction.editReply({ content: '❌ **ライセンスキーを入力してください。**\n新規登録の場合はBOOTHで送られたキーが必要です。' });
+        }
+        
+        let highestSub = existingSubs[0];
+        for (const sub of existingSubs) {
+            if (isUltimate(sub.tier)) {
+                highestSub = sub;
+                break;
+            } else if (isProPlus(sub.tier) && !isProPlus(highestSub.tier)) {
+                highestSub = sub;
+            }
+        }
+        
+        tier = highestSub.tier;
+        durationMonths = 0; 
+        durationDays = 0;
+    }
 
     // --- 1. Key Verification ---
     if (inputKey) {
@@ -63,10 +90,8 @@ module.exports = async (interaction) => {
                 else if (lowerTier === 'trial pro+') tier = 'Trial Pro+';
                 else tier = row.tier; // Fallback
 
-
-
                 durationMonths = row.duration_months;
-                durationDays = row.duration_days; // New field
+                durationDays = row.duration_days;
                 usedKey = row.key_id;
             } else {
                 return interaction.editReply({ content: '❌ **無効なキーまたは注文番号です。**\n入力が間違っている可能性があります。' });
@@ -85,34 +110,33 @@ module.exports = async (interaction) => {
 
     // Check existing subscriptions for this user
     try {
-        const existingResult = await db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND is_active = TRUE', [userId]);
-        const existingSubs = existingResult.rows;
-
-        // Check migration availability if this is a reactivation
-        const conflictRes = await db.query('SELECT * FROM subscriptions WHERE guild_id = $1', [guildId]);
-        if (conflictRes.rows.length > 0 && !conflictRes.rows[0].is_active) {
-            // This is a reactivation of a previously moved/deactivated sub
-            // We allow it if they just moved it here
-        }
-
         const isCurrentServerRegistered = existingSubs.some(s => s.guild_id === guildId);
 
         if (!isCurrentServerRegistered) {
-            // Check limits for new server registration
-            let maxLimit = 1;
+            // Calculate cumulative limits based on all active subscriptions
+            let totalSlots = 0;
+            let isUserUltimate = isUltimate(tier);
 
-            const isProPlus = (t) => {
-                if (!t) return false;
-                const s = String(t).toLowerCase();
-                return s === 'pro+' || s === '3' || s === '4';
-            };
+            // Tiers from existing subscriptions
+            existingSubs.forEach(s => {
+                if (isUltimate(s.tier)) isUserUltimate = true;
+                else if (isProPlus(s.tier)) totalSlots += 3;
+                else totalSlots += 1;
+            });
 
-            const hasProPlus = isProPlus(tier) || existingSubs.some(s => isProPlus(s.tier));
-            if (hasProPlus) maxLimit = 3;
+            // Add the tier currently being activated (from input key)
+            if (inputKey) {
+                if (isUltimate(tier)) isUserUltimate = true;
+                else if (isProPlus(tier)) totalSlots += 3;
+                else totalSlots += 1;
+            }
+
+            let maxLimit = isUserUltimate ? 999 : totalSlots;
+            if (maxLimit === 0) maxLimit = 1; // Default fallback
 
             if (existingSubs.length >= maxLimit) {
                 return interaction.editReply({
-                    content: `❌ **登録制限エラー**\nお使いのプラン (${hasProPlus ? 'Pro+' : 'Pro'}) では最大 ${maxLimit} サーバーまで登録可能です。\n現在の登録数: ${existingSubs.length}\n別のサーバーから移動する場合は、旧サーバーで \`/move\` を実行してください。`
+                    content: `❌ **登録制限エラー**\nお使いのプラン構成では最大 ${maxLimit} サーバーまで登録可能です。\n現在の登録数: ${existingSubs.length}\n別のサーバーから移動する場合は、旧サーバーで \`/move\` を実行してください。`
                 });
             }
         }
@@ -121,10 +145,26 @@ module.exports = async (interaction) => {
         let exp = new Date();
         if (tier === 'ULTIMATE') {
             exp = null;
-        } else if (durationDays) {
-            exp.setDate(exp.getDate() + durationDays);
+        } else if (inputKey) {
+            // New key used
+            if (durationDays) {
+                exp.setDate(exp.getDate() + durationDays);
+            } else {
+                exp.setMonth(exp.getMonth() + durationMonths);
+            }
         } else {
-            exp.setMonth(exp.getMonth() + durationMonths);
+            // Copied from existing sub, get the one with the furthest expiry
+            let furthestExp = existingSubs[0].expiry_date;
+            for (const sub of existingSubs) {
+                if (sub.expiry_date === null) {
+                    furthestExp = null;
+                    break;
+                }
+                if (furthestExp && sub.expiry_date && new Date(sub.expiry_date) > new Date(furthestExp)) {
+                    furthestExp = sub.expiry_date;
+                }
+            }
+            exp = furthestExp ? new Date(furthestExp) : null;
         }
 
         await db.query(`
@@ -159,10 +199,10 @@ module.exports = async (interaction) => {
 
         const expiryText = exp ? exp.toLocaleDateString() : '無期限 (ULTIMATE)';
         const portalUrl = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/portal.html` : null;
-        let successMsg = `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryText}\n**方法:** ライセンスキー\n\nサポートサーバーのロールも同期されました。`;
+        let successMsg = `✅ サーバー (ID: ${guildId}) を有効化しました！\n**Tier:** ${tier}\n**有効期限:** ${expiryText}\n**方法:** ${inputKey ? 'ライセンスキー' : '既存プランの追加枠利用'}\n\nサポートサーバーのロールも同期されました。`;
 
         if (portalUrl) {
-            successMsg += `\n\n🌐 **ポータルで管理:**\n${portalUrl}`;
+            successMsg += `\n\n🌐 **ポータルで管理:**\n<${portalUrl}>`;
         }
 
         await interaction.editReply({ content: successMsg });
@@ -172,4 +212,3 @@ module.exports = async (interaction) => {
         await interaction.editReply({ content: 'エラーが発生しました。管理者に連絡してください。' });
     }
 };
-

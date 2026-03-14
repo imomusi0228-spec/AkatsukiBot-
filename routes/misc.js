@@ -259,5 +259,61 @@ router.get('/version', (req, res) => {
     }
 });
 
+/**
+ * --- New Dashboard Evolution Features ---
+ */
+
+// GET /api/stats/trends (時系列分析データ)
+router.get('/stats/trends', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM stats_history ORDER BY captured_at ASC LIMIT 30');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('[Stats:Trends] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/export/:type (データエクスポート)
+router.get('/export/:type', authMiddleware, async (req, res) => {
+    const { type } = req.params;
+    const { format } = req.query; // 'csv' or 'json'
+
+    try {
+        let result;
+        if (type === 'subscriptions') {
+            result = await db.query('SELECT * FROM subscriptions ORDER BY created_at DESC');
+        } else if (type === 'applications') {
+            result = await db.query('SELECT * FROM applications ORDER BY created_at DESC');
+        } else if (type === 'logs') {
+            result = await db.query('SELECT * FROM operation_logs ORDER BY created_at DESC LIMIT 1000');
+        } else {
+            return res.status(400).json({ error: 'Invalid export type' });
+        }
+
+        if (format === 'json') {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', `attachment; filename=export_${type}_${new Date().getTime()}.json`);
+            return res.send(JSON.stringify(result.rows, null, 2));
+        } else {
+            // Simple CSV generation
+            const rows = result.rows;
+            if (rows.length === 0) return res.send('');
+            const headers = Object.keys(rows[0]).join(',');
+            const csv = rows.map(row => 
+                Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+            ).join('\n');
+            
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename=export_${type}_${new Date().getTime()}.csv`);
+            return res.send(headers + '\n' + csv);
+        }
+    } catch (err) {
+        console.error('[Export] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 module.exports = router;
 module.exports.executeAnnouncementTasks = executeAnnouncementTasks;

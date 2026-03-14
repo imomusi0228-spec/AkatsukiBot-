@@ -183,6 +183,14 @@ async function initDB() {
           is_active BOOLEAN DEFAULT TRUE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           last_used_at TIMESTAMP
+        `,
+      stats_history: `
+          id SERIAL PRIMARY KEY,
+          active_count INTEGER NOT NULL,
+          new_count INTEGER NOT NULL,
+          renew_count INTEGER NOT NULL,
+          total_revenue_est DECIMAL(10, 2) DEFAULT 0,
+          captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         `
     };
 

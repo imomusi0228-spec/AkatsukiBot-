@@ -34,7 +34,7 @@ function startCron(client) {
                 const warningTargetsRes = await db.query(`
                     SELECT guild_id, user_id, tier, expiry_date, auto_renew 
                     FROM subscriptions 
-                    WHERE is_active = TRUE AND expiry_warning_sent = FALSE 
+                    WHERE is_active = TRUE AND expiry_warning_sent = FALSE AND auto_renew = FALSE
                     AND (
                         (expiry_date <= NOW() + INTERVAL '7 days' AND tier NOT IN ('Free', '0', 'ULTIMATE') AND tier NOT LIKE 'Trial%')
                         OR (expiry_date <= NOW() + INTERVAL '1 day' AND tier LIKE 'Trial%')
@@ -144,6 +144,38 @@ function startCron(client) {
                 if (adminUser) await adminUser.send({ embeds: [reportEmbed] }).catch(() => null);
             }
         } catch (err) { console.error('[Cron] Monthly Report Error:', err); }
+    });
+
+    // 5. Daily Statistics Snapshot: 00:00
+    cron.schedule('0 0 * * *', async () => {
+        console.log('[Cron] Capturing daily statistics snapshot...');
+        try {
+            const activeRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE");
+            const newRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE created_at >= NOW() - INTERVAL '1 day'");
+            const renewRes = await db.query("SELECT COUNT(*) FROM operation_logs WHERE action_type = 'extend' AND created_at >= NOW() - INTERVAL '1 day'");
+            
+            // Simple revenue estimation logic
+            const revenueRes = await db.query(`
+                SELECT SUM(
+                    CASE 
+                        WHEN tier = 'Pro' THEN 500
+                        WHEN tier = 'Pro+' THEN 1000
+                        ELSE 0
+                    END
+                ) as total FROM subscriptions WHERE created_at >= NOW() - INTERVAL '1 day'
+            `);
+
+            await db.query(`
+                INSERT INTO stats_history (active_count, new_count, renew_count, total_revenue_est)
+                VALUES ($1, $2, $3, $4)
+            `, [
+                activeRes.rows[0].count || 0,
+                newRes.rows[0].count || 0,
+                renewRes.rows[0].count || 0,
+                revenueRes.rows[0].total || 0
+            ]);
+            console.log('[Cron] Statistics snapshot saved.');
+        } catch (err) { console.error('[Cron] Stats Snapshot Error:', err); }
     });
 }
 

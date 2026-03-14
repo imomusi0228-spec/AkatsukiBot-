@@ -9,6 +9,8 @@ createApp({
 
         // Data
         const stats = ref({
+            paid_count: 0,
+            total_count: 0,
             active_count: 0,
             expiring_soon_count: 0,
             new_this_month: 0,
@@ -37,6 +39,20 @@ createApp({
         const apiKeys = ref([]);
         const newRule = reactive({ pattern: '', tier: 'Pro', duration_months: 1, duration_days: null, match_type: 'regex', tier_mode: 'fixed' });
         const newApiKeyName = ref('');
+
+        const isBackingUp = ref(false);
+        const systemStatus = ref({
+            bot: { status: 'loading...', latency: 0, uptime: 0, guilds: 0, users: 0 },
+            system: { load: '0.00', memory: { percent: '0%', used: '0GB', total: '0GB' }, platform: '', release: '', cpuModel: '', cpuCount: 0 },
+            timestamp: new Date()
+        });
+
+        const userDetail = ref({
+            id: '',
+            displayName: '',
+            avatar: null,
+            servers: []
+        });
 
         const importPreview = ref([]);
         const isImporting = ref(false);
@@ -92,10 +108,33 @@ createApp({
             }
         };
 
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        };
+
         const api = async (endpoint, method = 'GET', body = null) => {
             const headers = { 'Content-Type': 'application/json' };
             const token = localStorage.getItem('admin_token');
             if (token) headers['Authorization'] = token;
+
+            // Add CSRF token for state-changing methods
+            if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase())) {
+                const csrfToken = getCookie('csrf_token');
+                if (csrfToken) {
+                    headers['X-CSRF-Token'] = csrfToken;
+                } else {
+                    // Fallback: try to fetch it if not in cookie yet
+                    try {
+                        const csrfRes = await fetch('/api/auth/csrf');
+                        const csrfData = await csrfRes.json();
+                        if (csrfData.csrfToken) headers['X-CSRF-Token'] = csrfData.csrfToken;
+                    } catch (e) {
+                        console.warn('CSRF fetch failed:', e);
+                    }
+                }
+            }
 
             const res = await fetch(`/api${endpoint}`, {
                 method,
@@ -106,11 +145,19 @@ createApp({
             console.log(`[API Response] ${method} ${endpoint} - Status: ${res.status}`);
 
             if (res.status === 401 || res.status === 403) {
-                console.warn(`[Auth Violation] API returned ${res.status} for ${endpoint}. Resetting frontend session.`);
-                if (res.status === 403) alert('権限がありません。');
-                user.value = null;
-                isAdminLogged.value = false;
-                localStorage.removeItem('admin_token');
+                console.warn(`[Auth Violation] API returned ${res.status} for ${endpoint}.`);
+                if (res.status === 403) {
+                    const errorMsg = await res.json().catch(() => ({}));
+                    if (errorMsg.error === 'CSRF Token Mismatch') {
+                        // Silently retry once after fetching CSRF could be better, but for now just alert
+                        alert('セッションの有効期限が切れました。ページを更新してもう一度お試しください。');
+                    } else {
+                        alert('権限がありません。');
+                    }
+                }
+                // Optional: don't reset session on 403 unless it's a real auth failure
+                // user.value = null;
+                // isAdminLogged.value = false;
             }
             return res.json();
         };
@@ -291,6 +338,57 @@ createApp({
             } catch (e) {
                 alert('エラーが発生しました: ' + e.message);
             }
+        };
+
+        const loadSystemStatus = async () => {
+            try {
+                const data = await api('/system/status');
+                if (data) systemStatus.value = data;
+            } catch (err) {
+                console.error('Failed to load system status:', err);
+            }
+        };
+
+        const triggerBackup = async () => {
+            if (!confirm('データベースのフルバックアップを実行しますか？')) return;
+            isBackingUp.value = true;
+            try {
+                const res = await api('/system/backup', 'POST');
+                if (res.success) {
+                    alert(`バックアップが完了しましたわ！\nファイル名: ${res.fileName}\n形式: ${res.type.toUpperCase()}`);
+                } else {
+                    alert('バックアップに失敗しました: ' + (res.error || '不明なエラー'));
+                }
+            } catch (err) {
+                alert('エラーが発生しました: ' + err.message);
+            } finally {
+                isBackingUp.value = false;
+            }
+        };
+
+        const showUserDetails = async (sub) => {
+            userDetail.value.id = sub.user_id;
+            userDetail.value.displayName = sub.user_display_name;
+            userDetail.value.avatar = sub.user_avatar ? `https://cdn.discordapp.com/avatars/${sub.user_id}/${sub.user_avatar}.png?size=128` : null;
+            userDetail.value.servers = [];
+
+            const modal = new bootstrap.Modal(document.getElementById('userDetailModal'));
+            modal.show();
+
+            try {
+                const servers = await api(`/subscriptions/user/${sub.user_id}/servers`);
+                userDetail.value.servers = servers || [];
+            } catch (err) {
+                console.error('Failed to fetch user servers:', err);
+            }
+        };
+
+        const formatDuration = (seconds) => {
+            const d = Math.floor(seconds / (3600 * 24));
+            const h = Math.floor(seconds % (3600 * 24) / 3600);
+            const m = Math.floor(seconds % 3600 / 60);
+            const s = Math.floor(seconds % 60);
+            return `${d}d ${h}h ${m}m ${s}s`;
         };
 
         const toggleSelectAll = (e) => {
@@ -628,7 +726,16 @@ createApp({
         });
 
         const generateHeatmap = () => {
-            // Heatmap logic is handled via detailedStats.heatmap_data which is fetched in loadData
+            const container = document.getElementById('vcHeatmap');
+            if (!container) return;
+            // The HTML already uses v-for with detailedStats.heatmap_data, 
+            // but we can add extra polish here if needed, or simply ensure the 
+            // data is correctly formatted. The Current HTML logic is:
+            // v-for="day in detailedStats.heatmap_data"
+            // So we don't strictly need a JS function to render it unless we want 
+            // a specialized library. We'll stick to the Vue-driven DOM for simplicity 
+            // and maybe add a simple animation.
+            container.classList.add('fade-in');
         };
 
         const removeFromBlacklist = async (id) => {
@@ -710,11 +817,19 @@ createApp({
         };
 
         const initGrowthChart = () => {
-            const ctx = document.getElementById('growthChart')?.getContext('2d');
+            const canvas = document.getElementById('growthChart');
+            const ctx = canvas?.getContext('2d');
             if (!ctx) return;
             if (window.myGrowthChart) window.myGrowthChart.destroy();
 
             const data = detailedStats.value.growth_data;
+            if (!data || data.length === 0) return;
+
+            // Gradient for the line
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(122, 162, 247, 0.4)');
+            gradient.addColorStop(1, 'rgba(122, 162, 247, 0)');
+
             window.myGrowthChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -723,7 +838,12 @@ createApp({
                         label: '新規契約数',
                         data: data.map(i => i.count),
                         borderColor: '#7aa2f7',
-                        backgroundColor: 'rgba(122, 162, 247, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#7aa2f7',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 6,
+                        pointRadius: 4,
+                        backgroundColor: gradient,
                         fill: true,
                         tension: 0.4
                     }]
@@ -731,12 +851,34 @@ createApp({
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' } },
-                        x: { grid: { display: false } }
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                            ticks: { color: '#565f89', font: { family: 'JetBrains Mono, monospace' } }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { color: '#565f89', font: { family: 'JetBrains Mono, monospace' } }
+                        }
                     },
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(26, 27, 38, 0.9)',
+                            titleColor: '#bb9af7',
+                            bodyColor: '#c0caf5',
+                            borderColor: '#414868',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            cornerRadius: 8,
+                            titleFont: { size: 14, weight: 'bold' }
+                        }
                     }
                 }
             });
@@ -906,7 +1048,48 @@ createApp({
             currentUserRole,
             automationRules, addAutomationRule, deleteAutomationRule,
             apiKeys, newApiKeyName, createApiKey, deleteApiKey,
-            newRule, rejectApplication, holdApplication
+            newRule, rejectApplication, holdApplication,
+            translateAction: (action) => {
+                const map = {
+                    'CREATE': '新規作成',
+                    'EXTEND': '期限延長',
+                    'UPDATE_TIER': 'Tier変更',
+                    'TOGGLE_ACTIVE': '有効/停止',
+                    'TOGGLE_AUTO_RENEW': '自動更新切替',
+                    'DEACTIVATE': '停止',
+                    'DELETE': '削除',
+                    'APPROVE_APP': '申請承認',
+                    'REJECT_APP': '申請却下',
+                    'CANCEL_APP': '申請キャンセル',
+                    'HOLD_APP': '申請保留'
+                };
+                return map[action] || action;
+            },
+            translateDetails: (details) => {
+                if (!details) return '';
+                if (details === 'Set auto_renew to true') return '自動更新をオンにしました';
+                if (details === 'Set auto_renew to false') return '自動更新をオフにしました';
+                if (details.startsWith('Changed to ')) return details.replace('Changed to', 'Tierを') + ' に変更しました';
+                if (details.startsWith('Duration extended by ')) return details.replace('Duration extended by', '期間を') + ' 延長しました';
+                if (details === 'Created via Discord Slash Command') return 'Discordコマンドから作成';
+                if (details === 'Deactivated via Admin Portal') return '管理画面から停止';
+                if (details === 'Deactivated via Discord System') return 'Discordシステムによって停止';
+                if (details === 'License Activated') return 'ライセンス有効化';
+                if (details === 'User Activated locally via panel') return 'パネルから有効化';
+                return details;
+            },
+            exportData: (format) => {
+                const tabToType = { dashboard: 'subscriptions', apps: 'applications', logs: 'logs' };
+                const type = tabToType[activeTab.value] || 'subscriptions';
+                const token = localStorage.getItem('token');
+                const url = `/api/export/${type}?format=${format}&token=${token}`;
+                window.open(url, '_blank');
+            },
+            triggerBackup: async () => {
+                if (!confirm('データベースのフルバックアップを開始しますか？')) return;
+                const res = await api('/system/backup', 'POST');
+                if (res.success) alert('バックアップを作成しました');
+            }
         };
     }
 }).mount('#app');

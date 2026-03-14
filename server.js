@@ -37,9 +37,11 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "fonts.googleapis.com"],
             fontSrc: ["'self'", "fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "cdn.discordapp.com", "images-ext-1.discordapp.net"],
-            connectSrc: ["'self'"]
+            connectSrc: ["'self'"],
+            upgradeInsecureRequests: null
         }
-    }
+    },
+    hsts: false
 }));
 
 // Global Rate Limiting
@@ -50,6 +52,14 @@ const limiter = rateLimit({
     legacyHeaders: false,
 });
 app.use('/api/', limiter);
+
+// Serve index.html without caching so UI updates show immediately
+app.get('/', (req, res) => {
+    // We can use the 'path' require from below by just requiring it inline or moving the require up.
+    // Given the structure, let's just use require('path') inline to fix it quickly avoiding duplicate const.
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.sendFile(require('path').join(__dirname, 'public', 'index.html'));
+});
 
 app.use(express.static('public'));
 
@@ -69,6 +79,7 @@ const routes = [
     { path: '/api/import', module: 'import' },
     { path: '/api/automations', module: 'automations' },
     { path: '/api/portal', module: 'portal' },
+    { path: '/api/system', module: 'system' },
     { path: '/api', module: 'misc' }
 ];
 

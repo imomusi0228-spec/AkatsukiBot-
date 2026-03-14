@@ -91,15 +91,20 @@ router.get('/', authMiddleware, async (req, res) => {
 router.get('/stats', authMiddleware, async (req, res) => {
     try {
         const stats = {
-            active_count: 0,
+            paid_count: 0,
+            total_count: 0,
             expiring_soon_count: 0,
             new_this_month: 0,
             renewed_this_month: 0
         };
 
-        // Active Count
-        const activeRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE AND tier != 'ULTIMATE'");
-        stats.active_count = parseInt(activeRes.rows[0].count);
+        // Total Active Count (All active licenses excluding ULTIMATE)
+        const totalRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE AND tier != 'ULTIMATE'");
+        stats.total_count = parseInt(totalRes.rows[0].count);
+
+        // Paid Count (Only Pro, Pro+, excluding Trials, Free, ULTIMATE)
+        const paidRes = await db.query("SELECT COUNT(*) FROM subscriptions WHERE is_active = TRUE AND tier IN ('Pro', 'Pro+', '1', '3')");
+        stats.paid_count = parseInt(paidRes.rows[0].count);
 
         // Expiring Soon (within 7 days)
         const expiringRes = await db.query(`
